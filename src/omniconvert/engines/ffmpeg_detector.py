@@ -61,13 +61,17 @@ class FFmpegDetector:
             match = re.search(r"ffprobe version\s+([^\s]+)", res_ffprobe.stdout)
             info.ffprobe_version = match.group(1) if match else "unknown"
 
-        # 3. Read Codecs
+        # 3. Read Codecs & Encoders
         res_codecs = self._runner.run([str(ffmpeg_bin), "-codecs"], timeout=10.0)
         if res_codecs.returncode == 0:
             for line in res_codecs.stdout.splitlines():
                 parts = line.strip().split()
                 if len(parts) >= 2 and len(parts[0]) == 6:
                     info.supported_codecs.add(parts[1].lower())
+                    enc_match = re.search(r"\(encoders:\s*([^)]+)\)", line)
+                    if enc_match:
+                        for enc in enc_match.group(1).split():
+                            info.supported_codecs.add(enc.strip().lower())
 
         # 4. Read Formats
         res_fmts = self._runner.run([str(ffmpeg_bin), "-formats"], timeout=10.0)

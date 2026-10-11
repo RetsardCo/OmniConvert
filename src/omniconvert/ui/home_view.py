@@ -1,9 +1,13 @@
-"""Home view / Landing page with drop area and quick action cards."""
+"""Home view / Landing page with drop area, custom branding icon, and quick action cards."""
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QFileDialog
 )
+
+from omniconvert.config.paths import get_icon_path
+
 
 class DropArea(QFrame):
     files_dropped = Signal(list)
@@ -24,15 +28,21 @@ class DropArea(QFrame):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)
 
-        icon_label = QLabel("📁")
-        icon_label.setStyleSheet("font-size: 42px; background: transparent;")
+        icon_label = QLabel()
+        icon_path = get_icon_path(prefer_ico=False)
+        if icon_path.exists():
+            pix = QPixmap(str(icon_path)).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_label.setPixmap(pix)
+        else:
+            icon_label.setText("📁")
+            icon_label.setStyleSheet("font-size: 42px; background: transparent;")
         icon_label.setAlignment(Qt.AlignCenter)
 
         title_label = QLabel("Drag & Drop Files Here")
         title_label.setStyleSheet("font-size: 16px; font-weight: bold; background: transparent;")
         title_label.setAlignment(Qt.AlignCenter)
 
-        sub_label = QLabel("or browse from your computer")
+        sub_label = QLabel("Convert PDF ⇄ Word, Images (Lossless 100%), Audio/Video, Spreadsheets & Archives — 100% Offline")
         sub_label.setStyleSheet("color: #8a8f98; font-size: 13px; background: transparent;")
         sub_label.setAlignment(Qt.AlignCenter)
 
@@ -70,34 +80,47 @@ class HomeView(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
+        layout.setSpacing(18)
 
+        header_row = QHBoxLayout()
+        logo_lbl = QLabel()
+        icon_path = get_icon_path(prefer_ico=False)
+        if icon_path.exists():
+            pix = QPixmap(str(icon_path)).scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_lbl.setPixmap(pix)
+            header_row.addWidget(logo_lbl)
+            header_row.addSpacing(10)
+
+        title_col = QVBoxLayout()
         header = QLabel("Welcome to OmniConvert")
         header.setStyleSheet("font-size: 22px; font-weight: bold;")
-        sub_header = QLabel("Universal offline file-processing and conversion workspace.")
+        sub_header = QLabel("Universal local-first file conversion, document workflow, and media workspace.")
         sub_header.setStyleSheet("color: #8a8f98; font-size: 14px;")
+        title_col.addWidget(header)
+        title_col.addWidget(sub_header)
+        header_row.addLayout(title_col)
+        header_row.addStretch()
 
-        layout.addWidget(header)
-        layout.addWidget(sub_header)
-        layout.addSpacing(10)
+        layout.addLayout(header_row)
+        layout.addSpacing(6)
 
         self.drop_area = DropArea()
         self.drop_area.files_dropped.connect(self._handle_files)
         layout.addWidget(self.drop_area)
 
         # Quick categories overview
-        cat_label = QLabel("Supported Categories")
-        cat_label.setStyleSheet("font-size: 15px; font-weight: 600; margin-top: 15px;")
+        cat_label = QLabel("Supported Categories & Highlights")
+        cat_label.setStyleSheet("font-size: 15px; font-weight: 600; margin-top: 10px;")
         layout.addWidget(cat_label)
 
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(12)
 
         categories = [
-            ("🖼️ Images", "PNG, JPG, WEBP, BMP, ICO"),
-            ("📄 Documents", "PDF, TXT, CSV, JSON"),
-            ("🎬 Media", "MP4, MKV, MP3, WAV (via FFmpeg)"),
-            ("📦 Archives", "ZIP, TAR, GZ extraction"),
+            ("📄 PDF ⇄ Word & Office", "PDF to Word (.docx), Word/Excel/PPT to PDF, Markdown, HTML, TXT, CSV, JSON"),
+            ("🖼️ Lossless Images", "PNG, JPEG (100% 4:4:4 Lossless Color), WebP, TIFF, BMP, SVG, Multi-Size .ICO"),
+            ("🎵 Full Audio & Video", "MP3 (320k), WAV (24-bit PCM), FLAC, AAC, M4A, OGG, OPUS, AIFF, MP4, MKV, WebM, GIF"),
+            ("📦 Archives & Workflows", "ZIP, TAR.GZ, 7Z safe extraction/packing, Local TTS Speech, Binary Inspection"),
         ]
 
         for title, desc in categories:

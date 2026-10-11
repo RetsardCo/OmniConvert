@@ -1,4 +1,4 @@
-"""Pillow Image Engine for format conversion, transformations, and ICO generation."""
+"""Pillow Image Engine for format conversion, lossless/detail presets, transformations, SVG rasterization, and ICO generation."""
 
 from pathlib import Path
 import logging
@@ -10,11 +10,20 @@ from omniconvert.models.conversion_job import ConversionJob, JobProgress
 
 logger = logging.getLogger(__name__)
 
+QUALITY_PRESET_MAP = {
+    "lossless": {"quality": 100, "subsampling": 0, "lossless": True},
+    "exact": {"quality": 100, "subsampling": 0, "lossless": True},
+    "high": {"quality": 95, "subsampling": 0, "lossless": False},
+    "balanced": {"quality": 85, "subsampling": 2, "lossless": False},
+    "compact": {"quality": 70, "subsampling": 2, "lossless": False},
+}
+
+
 class ImageEngine(BaseEngine):
-    """Executes raster image conversions and transformations using Pillow."""
+    """Executes raster and vector image conversions and transformations using Pillow and PyMuPDF."""
 
     def __init__(self):
-        self._supported_formats = {"png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "ico", "gif"}
+        self._supported_formats = {"png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "ico", "gif", "svg"}
 
     @property
     def name(self) -> str:
@@ -62,17 +71,20 @@ class ImageEngine(BaseEngine):
         pillow_fmt = fmt_map.get(target_format, target_format.upper())
 
         try:
-            with Image.open(source) as img:
-                # 1. Check for GIF frame extraction
-                if job.operation_id == "image.extract_frames" and getattr(img, "is_animated", False):
-                    return self._extract_gif_frames(img, workspace_dir, source.stem, progress_callback, is_cancelled)
+            if source.suffix.lower() == ".svg":
+                image = self._rasterize_svg(source, settings)
+            else:
+                with Image.open(source) as img:
+                    # 1. Check for GIF frame extraction
+                    if job.operation_id == "image.extract_frames" and getattr(img, "is_animated", False):
+                        return self._extract_gif_frames(img, workspace_dir, source.stem, progress_callback, is_cancelled)
 
-                # 2. Check for multi-resolution Windows Icon generation
-                if target_format == "ico" or job.operation_id == "image.to_ico":
-                    return self._generate_ico(img, workspace_dir, source.stem, settings, progress_callback, is_cancelled)
+                    # 2. Check for multi-resolution Windows Icon generation
+                    if target_format == "ico" or job.operation_id == "image.to_ico":
+                        return self._generate_ico(img, workspace_dir, source.stem, settings, progress_callback, is_cancelled)
 
-                # Convert to memory copy so we can process freely
-                image = img.copy()
+                    # Convert to memory copy so we can process freely
+                    image = img.copy()
 
         except Exception as e:
             raise ValueError(f"Could not open source image: {e}")
@@ -80,7 +92,10 @@ class ImageEngine(BaseEngine):
         if is_cancelled and is_cancelled():
             raise InterruptedError("Job cancelled.")
 
-        # 3. Apply optional transformations (Resize, Rotate, Flip)
+        if target_format == "ico" or job.operation_id == "image.to_ico":
+            return self._generate_ico(image, workspace_dir, source.stem, settings, progress_callback, is_cancelled)
+
+        # 3. Apply optional transformations (Resize, Rotate, Crop)
         image = self._apply_transformations(image, settings, progress_callback)
 
         # 4. Handle Transparency / Color Modes
@@ -99,15 +114,43 @@ class ImageEngine(BaseEngine):
         if preserve_metadata and "exif" in image.info and pillow_fmt in ("JPEG", "WEBP", "PNG"):
             save_kwargs["exif"] = image.info["exif"]
 
-        # Quality / Compression settings
+        # 6. Quality / Detail Preset & Fine-grained Compression settings
+        preset_key = str(settings.get("quality_preset", "")).lower()
+        preset_defaults = QUALITY_PRESET_MAP.get(preset_key, {})
+
         if pillow_fmt == "JPEG":
-            save_kwargs["quality"] = int(settings.get("quality", 85))
+            default_q = preset_defaults.get("quality", 100 if settings.get("lossless") else 95)
+            quality = max(1, min(100, int(settings.get("quality", default_q))))
+            save_kwargs["quality"] = quality
             save_kwargs["optimize"] = True
+
+            # Chroma subsampling: 0 = 4:4:4 (no color subsampling / exact color fidelity), 1 = 4:2:2, 2 = 4:2:0
+            subsampling_setting = settings.get("subsampling", preset_defaults.get("subsampling", 0 if quality >= 95 else 2))
+            if isinstance(subsampling_setting, str):
+                if "4:4:4" in subsampling_setting or subsampling_setting == "0":
+                    save_kwargs["subsampling"] = 0
+                elif "4:2:2" in subsampling_setting or subsampling_setting == "1":
+                    save_kwargs["subsampling"] = 1
+                else:
+                    save_kwargs["subsampling"] = 2
+            else:
+                save_kwargs["subsampling"] = int(subsampling_setting)
+
         elif pillow_fmt == "WEBP":
-            save_kwargs["quality"] = int(settings.get("quality", 80))
-            save_kwargs["lossless"] = bool(settings.get("lossless", False))
+            default_lossless = preset_defaults.get("lossless", False)
+            default_q = preset_defaults.get("quality", 90)
+            is_lossless = bool(settings.get("lossless", default_lossless))
+            quality = max(1, min(100, int(settings.get("quality", 100 if is_lossless else default_q))))
+            save_kwargs["lossless"] = is_lossless
+            save_kwargs["quality"] = quality
+            save_kwargs["method"] = 6
+
         elif pillow_fmt == "PNG":
             save_kwargs["optimize"] = True
+            save_kwargs["compress_level"] = int(settings.get("compress_level", 6))
+
+        elif pillow_fmt == "TIFF":
+            save_kwargs["compression"] = settings.get("compression", "tiff_lzw")
 
         image.save(target_file, format=pillow_fmt, **save_kwargs)
 
@@ -115,6 +158,22 @@ class ImageEngine(BaseEngine):
             progress_callback(JobProgress(percentage=100.0, stage="Complete", detail="Image written successfully"))
 
         return target_file
+
+    def _rasterize_svg(self, svg_path: Path, settings: Dict[str, Any]) -> Image.Image:
+        """Rasterize an SVG vector file into an RGBA PIL Image using PyMuPDF."""
+        import fitz
+        dpi = int(settings.get("dpi", 300))
+        doc = fitz.open(str(svg_path))
+        if len(doc) == 0:
+            doc.close()
+            raise ValueError("SVG file contains no drawable page.")
+        try:
+            page = doc[0]
+            pix = page.get_pixmap(dpi=dpi, alpha=True)
+            img = Image.frombytes("RGBA", [pix.width, pix.height], pix.samples)
+            return img
+        finally:
+            doc.close()
 
     def _prepare_color_mode(
         self,
@@ -131,19 +190,21 @@ class ImageEngine(BaseEngine):
             if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
                 job.warnings.append("Transparency was flattened because target format does not support alpha.")
                 bg_color = settings.get("background_color", "#FFFFFF")
-                # Parse hex or tuple color
                 fill_color = (255, 255, 255)
                 if isinstance(bg_color, str) and bg_color.startswith("#") and len(bg_color) == 7:
-                    fill_color = (
-                        int(bg_color[1:3], 16),
-                        int(bg_color[3:5], 16),
-                        int(bg_color[5:7], 16)
-                    )
+                    try:
+                        fill_color = (
+                            int(bg_color[1:3], 16),
+                            int(bg_color[3:5], 16),
+                            int(bg_color[5:7], 16)
+                        )
+                    except ValueError:
+                        pass
 
                 background = Image.new("RGB", image.size, fill_color)
                 if image.mode != "RGBA":
                     image = image.convert("RGBA")
-                background.paste(image, mask=image.split()[3]) # 3 is alpha channel
+                background.paste(image, mask=image.split()[3])
                 image = background
             elif image.mode != "RGB":
                 image = image.convert("RGB")
@@ -160,29 +221,43 @@ class ImageEngine(BaseEngine):
         settings: Dict[str, Any],
         progress_callback: Optional[Callable]
     ) -> Image.Image:
-        """Applies resize, rotation, and auto-orientation."""
-        # Auto-orient based on EXIF tag
+        """Applies crop, resize, rotation, and auto-orientation."""
         try:
             image = ImageOps.exif_transpose(image) or image
         except Exception:
             pass
 
+        # Optional Crop (left, top, right, bottom)
+        crop_box = settings.get("crop_box")
+        if crop_box and isinstance(crop_box, (list, tuple)) and len(crop_box) == 4:
+            image = image.crop(tuple(int(x) for x in crop_box))
+
         # Resize (scale or explicit dimensions) first
         width = settings.get("width")
         height = settings.get("height")
-        if width and height:
-            image = image.resize((int(width), int(height)), Image.Resampling.LANCZOS)
-        elif width:
+        try:
+            width = int(width) if width else 0
+            height = int(height) if height else 0
+        except (ValueError, TypeError):
+            width, height = 0, 0
+
+        if width > 0 and height > 0:
+            image = image.resize((width, height), Image.Resampling.LANCZOS)
+        elif width > 0:
             ratio = width / image.width
-            new_h = int(image.height * ratio)
-            image = image.resize((int(width), new_h), Image.Resampling.LANCZOS)
-        elif height:
+            new_h = max(1, int(image.height * ratio))
+            image = image.resize((width, new_h), Image.Resampling.LANCZOS)
+        elif height > 0:
             ratio = height / image.height
-            new_w = int(image.width * ratio)
-            image = image.resize((new_w, int(height)), Image.Resampling.LANCZOS)
+            new_w = max(1, int(image.width * ratio))
+            image = image.resize((new_w, height), Image.Resampling.LANCZOS)
 
         # Rotation after resize
-        rotate_angle = settings.get("rotate", 0)
+        try:
+            rotate_angle = int(settings.get("rotate", 0))
+        except (ValueError, TypeError):
+            rotate_angle = 0
+
         if rotate_angle in (90, 180, 270):
             image = image.rotate(360 - rotate_angle, expand=True)
 
@@ -218,7 +293,7 @@ class ImageEngine(BaseEngine):
         progress_callback: Optional[Callable],
         is_cancelled: Optional[Callable]
     ) -> Path:
-        """Extract all frames of an animated image to a folder, or first frame."""
+        """Extract all frames of an animated image to a folder."""
         frames_dir = workspace_dir / f"{stem}_frames"
         frames_dir.mkdir(parents=True, exist_ok=True)
 

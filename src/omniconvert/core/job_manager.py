@@ -9,16 +9,23 @@ import datetime
 from PySide6.QtCore import QObject, Signal, QRunnable, QThreadPool
 
 from omniconvert.models.conversion_job import ConversionJob, JobState, JobProgress, JobError, resolve_output_collision
+from omniconvert.models.workflow import WorkflowStepError
 from omniconvert.core.temp_files import JobWorkspace
 from omniconvert.core.validation import validate_output
+from omniconvert.core.planner import WorkflowEngine
 from omniconvert.engines.base import BaseEngine
 from omniconvert.engines.data_engine import DataEngine
 from omniconvert.engines.ffmpeg_engine import FFmpegEngine
 from omniconvert.engines.image_engine import ImageEngine
 from omniconvert.engines.pdf_engine import PDFEngine
 from omniconvert.engines.office_engine import OfficeEngine
+from omniconvert.engines.archive_engine import ArchiveEngine
+from omniconvert.engines.binary_engine import BinaryEngine
+from omniconvert.engines.ocr_engine import OCREngine
+from omniconvert.engines.speech_engine import TTSEngine, ASREngine
 
 logger = logging.getLogger(__name__)
+
 
 class WorkerSignals(QObject):
     """Signals for communicating safe worker updates back to the UI thread."""
@@ -46,7 +53,7 @@ class JobExecutionRunnable(QRunnable):
         self.signals = signals
         self.collision_policy = collision_policy
         self._is_cancelled = False
-        self.setAutoDelete(True)
+        self.setAutoDelete(False)
 
     def cancel(self):
         self._is_cancelled = True
@@ -98,21 +105,38 @@ class JobExecutionRunnable(QRunnable):
 
             # 4. Safe Delivery: move to destination folder
             dest_dir = self.job.destination_path or self.job.source_path.parent
-            final_target = resolve_output_collision(
-                output_dir=dest_dir,
-                stem=self.job.source_path.stem,
-                target_ext=self.job.target_format,
-                policy=self.collision_policy
-            )
+            dest_dir.mkdir(parents=True, exist_ok=True)
 
-            # Prevent overwriting source file accidentally
-            if final_target.resolve() == self.job.source_path.resolve():
+            if intermediate_file.is_dir() or self.job.target_format == "dir":
+                base_folder_name = intermediate_file.name or f"{self.job.source_path.stem}_extracted"
+                final_target = dest_dir / base_folder_name
+                if final_target.exists():
+                    if self.collision_policy == "overwrite":
+                        shutil.rmtree(final_target, ignore_errors=True)
+                    else:
+                        counter = 1
+                        while True:
+                            candidate = dest_dir / f"{base_folder_name} ({counter})"
+                            if not candidate.exists():
+                                final_target = candidate
+                                break
+                            counter += 1
+            else:
                 final_target = resolve_output_collision(
                     output_dir=dest_dir,
-                    stem=f"{self.job.source_path.stem}_converted",
+                    stem=self.job.source_path.stem,
                     target_ext=self.job.target_format,
-                    policy="rename"
+                    policy=self.collision_policy
                 )
+
+                # Prevent overwriting source file accidentally
+                if final_target.resolve() == self.job.source_path.resolve():
+                    final_target = resolve_output_collision(
+                        output_dir=dest_dir,
+                        stem=f"{self.job.source_path.stem}_converted",
+                        target_ext=self.job.target_format,
+                        policy="rename"
+                    )
 
             shutil.move(str(intermediate_file), str(final_target))
             self.job.destination_path = final_target
@@ -123,6 +147,19 @@ class JobExecutionRunnable(QRunnable):
 
         except InterruptedError:
             self._handle_cancelled()
+
+        except WorkflowStepError as we:
+            logger.error("Workflow Job %s failed at step %s: %s", job_id, we.step_index, we)
+            self.job.state = JobState.FAILED
+            self.job.finished_at = datetime.datetime.now()
+            err = JobError(
+                code="WORKFLOW_STEP_ERROR",
+                message=str(we),
+                step=f"Step {we.step_index} ({we.capability_id})"
+            )
+            self.job.error = err
+            self.signals.state_changed.emit(job_id, JobState.FAILED)
+            self.signals.failed.emit(job_id, err)
 
         except Exception as e:
             logger.error("Job %s execution failed: %s", job_id, e, exc_info=True)
@@ -157,10 +194,12 @@ class JobManager(QObject):
         self._runnables: Dict[str, JobExecutionRunnable] = {}
         self._engines: Dict[str, BaseEngine] = {}
 
-        # Register default baseline engines
+        # Register core engines
         self.register_engine(DataEngine())
         self.register_engine(ImageEngine())
         self.register_engine(PDFEngine())
+        self.register_engine(ArchiveEngine())
+        self.register_engine(BinaryEngine())
 
         office_eng = OfficeEngine()
         if office_eng.is_available():
@@ -170,8 +209,26 @@ class JobManager(QObject):
         if ffmpeg_eng.is_available():
             self.register_engine(ffmpeg_eng)
 
+        tts_eng = TTSEngine()
+        if tts_eng.is_available():
+            self.register_engine(tts_eng)
+
+        ocr_eng = OCREngine()
+        if ocr_eng.is_available():
+            self.register_engine(ocr_eng)
+
+        asr_eng = ASREngine()
+        if asr_eng.is_available():
+            self.register_engine(asr_eng)
+
+        # Register composite workflow engine
+        self.register_engine(WorkflowEngine(self._engines))
+
     def register_engine(self, engine: BaseEngine):
         self._engines[engine.name] = engine
+
+    def get_engine(self, name: str) -> Optional[BaseEngine]:
+        return self._engines.get(name)
 
     def get_job(self, job_id: str) -> Optional[ConversionJob]:
         return self._jobs.get(job_id)

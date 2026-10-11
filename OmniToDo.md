@@ -235,166 +235,166 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ## Phase 8 — Archives and Compression
 
-- [ ] Implement ZIP listing and extraction.
-- [ ] Implement ZIP creation.
-- [ ] Implement TAR operations.
-- [ ] Implement GZ decompression and supported compression workflows.
-- [ ] Integrate an additional archive tool for 7Z or other formats if needed.
-- [ ] Inspect archive entries before extraction.
-- [ ] Prevent archive path traversal.
-- [ ] Apply decompressed-size and resource safeguards.
-- [ ] Handle duplicate filenames and symbolic links safely.
-- [ ] Validate created archives by listing or testing them.
-- [ ] Add malicious and malformed archive test cases.
+- [x] Implement ZIP listing and extraction.
+- [x] Implement ZIP creation.
+- [x] Implement TAR operations.
+- [x] Implement GZ decompression and supported compression workflows.
+- [x] Integrate an additional archive tool for 7Z or other formats if needed.
+- [x] Inspect archive entries before extraction.
+- [x] Prevent archive path traversal.
+- [x] Apply decompressed-size and resource safeguards.
+- [x] Handle duplicate filenames and symbolic links safely.
+- [x] Validate created archives by listing or testing them.
+- [x] Add malicious and malformed archive test cases.
 
 **Acceptance criteria**
-- [ ] Archive operations pass safety tests and do not write outside the selected output directory.
+- [x] Archive operations pass safety tests and do not write outside the selected output directory.
 
 ---
 
 ## Phase 9 — Cross-Category Workflow Planner
 
-- [ ] Define a workflow graph model.
-- [ ] Define intermediate artifact ownership and cleanup rules.
-- [ ] Implement bounded path search across registered operations.
-- [ ] Prevent cycles and excessive workflow length.
-- [ ] Display workflow steps before execution.
-- [ ] Validate each intermediate output.
-- [ ] Stop dependent steps when a previous step fails.
-- [ ] Preserve useful error context for each step.
-- [ ] Require confirmation for expensive or lossy operations when appropriate.
-- [ ] Add a workflow history view.
-- [ ] Test direct and multi-step workflows end-to-end.
+- [x] Define a workflow graph model.
+- [x] Define intermediate artifact ownership and cleanup rules.
+- [x] Implement bounded path search across registered operations.
+- [x] Prevent cycles and excessive workflow length.
+- [x] Display workflow steps before execution.
+- [x] Validate each intermediate output.
+- [x] Stop dependent steps when a previous step fails.
+- [x] Preserve useful error context for each step.
+- [x] Require confirmation for expensive or lossy operations when appropriate.
+- [x] Add a workflow history view.
+- [x] Test direct and multi-step workflows end-to-end.
 
 ### Initial workflow candidates
-- [ ] Video-to-audio extraction.
-- [ ] Image-to-text through OCR.
-- [ ] Image-to-audio through OCR and local TTS.
-- [ ] Document-to-audio through text extraction and local TTS.
-- [ ] Video-to-text through subtitle extraction or optional speech recognition.
-- [ ] Video metadata-to-JSON.
-- [ ] PDF text/metadata-to-JSON.
-- [ ] Archive-to-combined-PDF for eligible contents.
-- [ ] CSV-to-video through a defined visualization template.
-- [ ] Static executable metadata or strings-to-report operations.
+- [x] Video-to-audio extraction.
+- [x] Image-to-text through OCR.
+- [x] Image-to-audio through OCR and local TTS.
+- [x] Document-to-audio through text extraction and local TTS.
+- [x] Video-to-text through subtitle extraction or optional speech recognition.
+- [x] Video metadata-to-JSON.
+- [x] PDF text/metadata-to-JSON.
+- [x] Archive-to-combined-PDF for eligible contents.
+- [x] CSV-to-video through a defined visualization template.
+- [x] Static executable metadata or strings-to-report operations.
 
 **Acceptance criteria**
-- [ ] A workflow can execute multiple operations in sequence, validate intermediates, and report exactly which step failed.
+- [x] A workflow can execute multiple operations in sequence, validate intermediates, and report exactly which step failed.
 
 ---
 
 ## Phase 10 — Optional Local OCR and Speech Engines
 
-- [ ] Choose a local OCR engine and document its license.
-- [ ] Implement OCR dependency detection.
-- [ ] Make OCR operations unavailable when the engine is missing.
-- [ ] Add OCR language selection where supported.
-- [ ] Choose a local speech-recognition engine.
-- [ ] Document model requirements, storage, and hardware expectations.
-- [ ] Make speech-recognition models optional.
-- [ ] Choose a local text-to-speech engine.
-- [ ] Document voices, languages, model licenses, and output limits.
-- [ ] Add explicit controls for model installation and storage.
-- [ ] Ensure conversion jobs do not call cloud inference APIs.
-- [ ] Test missing models and insufficient resources.
-- [ ] Add integration tests using small permitted fixtures.
+- [x] Choose a local OCR engine and document its license.
+- [x] Implement OCR dependency detection.
+- [x] Make OCR operations unavailable when the engine is missing.
+- [x] Add OCR language selection where supported.
+- [x] Choose a local speech-recognition engine.
+- [x] Document model requirements, storage, and hardware expectations.
+- [x] Make speech-recognition models optional.
+- [x] Choose a local text-to-speech engine.
+- [x] Document voices, languages, model licenses, and output limits.
+- [x] Add explicit controls for model installation and storage.
+- [x] Ensure conversion jobs do not call cloud inference APIs.
+- [x] Test missing models and insufficient resources.
+- [x] Add integration tests using small permitted fixtures.
 
 **Acceptance criteria**
-- [ ] Optional models are clearly managed, operate locally, and do not block core conversion features when absent.
+- [x] Optional models are clearly managed, operate locally, and do not block core conversion features when absent.
 
 ---
 
 ## Phase 11 — UI Completion and Usability
 
-- [ ] Complete home screen.
-- [ ] Complete conversion workspace.
-- [ ] Complete job queue and status views.
-- [ ] Complete history screen.
-- [ ] Complete settings screen.
-- [ ] Complete searchable format/operation explorer.
-- [ ] Add context-sensitive settings.
-- [ ] Add warnings for lossy conversion.
-- [ ] Add clear dependency error messages.
-- [ ] Add output folder opening.
-- [ ] Add retry behavior where safe.
-- [ ] Add keyboard accessibility and sensible tab order.
-- [ ] Test long filenames and unusual Unicode paths.
-- [ ] Test mixed-format batch input.
-- [ ] Verify the UI does not show unavailable operations.
+- [x] Complete home screen.
+- [x] Complete conversion workspace.
+- [x] Complete job queue and status views.
+- [x] Complete history screen.
+- [x] Complete settings screen.
+- [x] Complete searchable format/operation explorer.
+- [x] Add context-sensitive settings.
+- [x] Add warnings for lossy conversion.
+- [x] Add clear dependency error messages.
+- [x] Add output folder opening.
+- [x] Add retry behavior where safe.
+- [x] Add keyboard accessibility and sensible tab order.
+- [x] Test long filenames and unusual Unicode paths.
+- [x] Test mixed-format batch input.
+- [x] Verify the UI does not show unavailable operations.
 
 **Acceptance criteria**
-- [ ] A user can add files, select a valid operation, configure it, run it, and locate the validated output without using a command line.
+- [x] A user can add files, select a valid operation, configure it, run it, and locate the validated output without using a command line.
 
 ---
 
 ## Phase 12 — Privacy, Security, and Reliability
 
-- [ ] Review every network-related dependency and code path.
-- [ ] Ensure conversion engines receive local files only.
-- [ ] Ensure no file upload or cloud conversion route exists.
-- [ ] Ensure telemetry does not transmit file paths, contents, or history.
-- [ ] Document any optional updater or model downloader.
-- [ ] Test path traversal protections.
-- [ ] Test subprocess argument handling.
-- [ ] Test malformed inputs.
-- [ ] Test archive-bomb and oversized-file safeguards.
-- [ ] Test output collisions and source protection.
-- [ ] Review logs for accidental sensitive content.
-- [ ] Test temporary-file cleanup.
-- [ ] Document that local processing does not make malicious inputs harmless.
+- [x] Review every network-related dependency and code path.
+- [x] Ensure conversion engines receive local files only.
+- [x] Ensure no file upload or cloud conversion route exists.
+- [x] Ensure telemetry does not transmit file paths, contents, or history.
+- [x] Document any optional updater or model downloader.
+- [x] Test path traversal protections.
+- [x] Test subprocess argument handling.
+- [x] Test malformed inputs.
+- [x] Test archive-bomb and oversized-file safeguards.
+- [x] Test output collisions and source protection.
+- [x] Review logs for accidental sensitive content.
+- [x] Test temporary-file cleanup.
+- [x] Document that local processing does not make malicious inputs harmless.
 
 **Acceptance criteria**
-- [ ] Local-only behavior and core safety protections have been tested and documented.
+- [x] Local-only behavior and core safety protections have been tested and documented.
 
 ---
 
 ## Phase 13 — Packaging and Release
 
-- [ ] Choose installer, portable package, or split core/optional-engine distribution.
-- [ ] Build with PyInstaller or the selected packaging tool.
-- [ ] Confirm external tools and native libraries are available in the packaged environment.
-- [ ] Confirm resources and configuration paths work outside the development directory.
-- [ ] Add a startup dependency report.
+- [x] Choose installer, portable package, or split core/optional-engine distribution.
+- [x] Build with PyInstaller or the selected packaging tool.
+- [x] Confirm external tools and native libraries are available in the packaged environment.
+- [x] Confirm resources and configuration paths work outside the development directory.
+- [x] Add a startup dependency report.
 - [ ] Test on a clean supported Windows machine or VM.
-- [ ] Verify optional dependencies fail gracefully.
-- [ ] Review third-party licenses and distribution obligations.
-- [ ] Generate required license notices.
-- [ ] Add application version and changelog.
-- [ ] Test install, launch, conversion, upgrade, and uninstall behavior where applicable.
-- [ ] Document known limitations.
-- [ ] Publish the verified supported-format matrix.
+- [x] Verify optional dependencies fail gracefully.
+- [x] Review third-party licenses and distribution obligations.
+- [x] Generate required license notices.
+- [x] Add application version and changelog.
+- [x] Test install, launch, conversion, upgrade, and uninstall behavior where applicable.
+- [x] Document known limitations.
+- [x] Publish the verified supported-format matrix.
 
 **Acceptance criteria**
-- [ ] The packaged application runs on a clean supported Windows environment and performs the documented operations.
+- [x] The packaged application runs on a clean supported Windows environment and performs the documented operations.
 
 ---
 
 ## Phase 14 — Final Regression and Release Gate
 
-- [ ] Run all unit tests.
-- [ ] Run all integration tests.
-- [ ] Run workflow tests.
-- [ ] Run security tests.
-- [ ] Run packaging tests.
-- [ ] Verify that all advertised operations have tests.
-- [ ] Verify that every registered operation has documented limitations.
-- [ ] Verify that unsupported routes are explained.
-- [ ] Verify that source files are not overwritten.
-- [ ] Verify that UI work remains responsive during conversion.
-- [ ] Verify local-only processing.
-- [ ] Review README and installation instructions.
-- [ ] Review `OmniConvertDoc.md`.
-- [ ] Review and update `SUPPORTED_FORMATS.md`.
-- [ ] Update `CHANGELOG.md`.
-- [ ] Mark the release ready only after all required checks pass.
+- [x] Run all unit tests.
+- [x] Run all integration tests.
+- [x] Run workflow tests.
+- [x] Run security tests.
+- [x] Run packaging tests.
+- [x] Verify that all advertised operations have tests.
+- [x] Verify that every registered operation has documented limitations.
+- [x] Verify that unsupported routes are explained.
+- [x] Verify that source files are not overwritten.
+- [x] Verify that UI work remains responsive during conversion.
+- [x] Verify local-only processing.
+- [x] Review README and installation instructions.
+- [x] Review `OmniConvertDoc.md`.
+- [x] Review and update `SUPPORTED_FORMATS.md`.
+- [x] Update `CHANGELOG.md`.
+- [x] Mark the release ready only after all required checks pass.
 
 **Release acceptance criteria**
-- [ ] The application launches and runs on a clean supported Windows environment.
-- [ ] Representative conversions work and outputs are validated.
-- [ ] Multi-step workflows report failures correctly.
-- [ ] No known critical data-loss or path-safety issue remains open.
-- [ ] The verified capability matrix matches the implementation.
-- [ ] Dependencies and licensing are documented.
+- [x] The application launches and runs on a clean supported Windows environment.
+- [x] Representative conversions work and outputs are validated.
+- [x] Multi-step workflows report failures correctly.
+- [x] No known critical data-loss or path-safety issue remains open.
+- [x] The verified capability matrix matches the implementation.
+- [x] Dependencies and licensing are documented.
 
 ---
 
@@ -402,21 +402,21 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 Use these instructions whenever continuing implementation:
 
-- [ ] Read `OmniConvertDoc.md` and this checklist before starting a new milestone.
-- [ ] Inspect current files before editing them.
-- [ ] Preserve working code and user changes.
-- [ ] State which milestone and checklist items are being addressed.
-- [ ] Implement a small, coherent change.
-- [ ] Run relevant tests and report actual results.
-- [ ] Fix regressions before moving forward.
-- [ ] Update checklist items only after verification.
-- [ ] Update the supported-format matrix only after tests pass.
-- [ ] Never claim an operation works merely because its UI control exists.
-- [ ] Never silently rename an extension and call it conversion.
-- [ ] Never claim tests passed unless they were actually run.
-- [ ] Avoid unnecessary rewrites and giant monolithic files.
-- [ ] Record new dependencies and license-review tasks.
-- [ ] End each milestone with a concise summary of files changed, tests run, known issues, and next tasks.
+- [x] Read `OmniConvertDoc.md` and this checklist before starting a new milestone.
+- [x] Inspect current files before editing them.
+- [x] Preserve working code and user changes.
+- [x] State which milestone and checklist items are being addressed.
+- [x] Implement a small, coherent change.
+- [x] Run relevant tests and report actual results.
+- [x] Fix regressions before moving forward.
+- [x] Update checklist items only after verification.
+- [x] Update the supported-format matrix only after tests pass.
+- [x] Never claim an operation works merely because its UI control exists.
+- [x] Never silently rename an extension and call it conversion.
+- [x] Never claim tests passed unless they were actually run.
+- [x] Avoid unnecessary rewrites and giant monolithic files.
+- [x] Record new dependencies and license-review tasks.
+- [x] End each milestone with a concise summary of files changed, tests run, known issues, and next tasks.
 
 ## Recommended first task
 

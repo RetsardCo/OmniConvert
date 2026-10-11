@@ -31,3 +31,30 @@ def get_logs_dir() -> Path:
     path = get_app_data_dir() / "logs"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+def get_resources_dir() -> Path:
+    """Return directory containing application static resources and icons."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        res_dir = Path(getattr(sys, "_MEIPASS")) / "omniconvert" / "resources"
+        if res_dir.exists():
+            return res_dir
+    path = Path(__file__).resolve().parent.parent / "resources"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+def get_icon_path(prefer_ico: bool = False) -> Path:
+    """Return path to the application icon (.png or .ico)."""
+    res_dir = get_resources_dir()
+    if prefer_ico:
+        ico_path = res_dir / "icon.ico"
+        if ico_path.exists():
+            return ico_path
+    png_path = res_dir / "icon.png"
+    if png_path.exists():
+        return png_path
+    return res_dir / "icon.ico"
+
+def get_history_path() -> Path:
+    """Return path to the persistent conversion history JSON file."""
+    return get_app_data_dir() / "history.json"
+

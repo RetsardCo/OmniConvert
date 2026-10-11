@@ -1,6 +1,8 @@
-"""Job Queue UI View displaying real-time background jobs and status."""
+"""Job Queue UI View displaying real-time background jobs, output folder opening, and retry actions."""
 
-from PySide6.QtCore import Qt, Slot
+from pathlib import Path
+from PySide6.QtCore import Qt, Slot, Signal, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QProgressBar, QScrollArea
@@ -9,13 +11,15 @@ from PySide6.QtWidgets import (
 from omniconvert.models.conversion_job import ConversionJob, JobState, JobProgress, JobError
 from omniconvert.core.job_manager import JobManager
 
+
 class JobCard(QFrame):
     """Visual card representing a single background conversion job."""
 
-    def __init__(self, job: ConversionJob, on_cancel: callable, parent=None):
+    def __init__(self, job: ConversionJob, on_cancel: callable, on_retry: callable = None, parent=None):
         super().__init__(parent)
         self.job = job
         self.on_cancel = on_cancel
+        self.on_retry = on_retry
         self.setObjectName("card")
         self.setStyleSheet("""
             QFrame#card {
@@ -30,17 +34,32 @@ class JobCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setSpacing(6)
 
-        # Header row: file name + state badge + cancel button
+        # Header row: file name + state badge + action buttons
         header_row = QHBoxLayout()
-        self.title_lbl = QLabel(f"📄 {job.source_path.name} ➔ .{job.target_format.upper()}")
+        preset = (job.settings or {}).get("quality_preset", "lossless").upper()
+        self.title_lbl = QLabel(f"📄 {job.source_path.name} ➔ .{job.target_format.upper()}  [{preset}]")
         self.title_lbl.setStyleSheet("font-weight: bold; font-size: 13px; background: transparent;")
         header_row.addWidget(self.title_lbl)
 
         header_row.addStretch()
 
         self.state_lbl = QLabel(job.state.value.capitalize())
-        self.state_lbl.setStyleSheet("font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; background-color: #3b82f6; color: white;")
+        self.state_lbl.setStyleSheet("font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background-color: #3b82f6; color: white;")
         header_row.addWidget(self.state_lbl)
+
+        self.open_btn = QPushButton("Open Folder")
+        self.open_btn.setFixedSize(90, 24)
+        self.open_btn.setStyleSheet("font-size: 11px; padding: 2px 6px; background-color: #0284c7; color: white; border: none; border-radius: 4px;")
+        self.open_btn.clicked.connect(self._open_output_folder)
+        self.open_btn.hide()
+        header_row.addWidget(self.open_btn)
+
+        self.retry_btn = QPushButton("Retry")
+        self.retry_btn.setFixedSize(60, 24)
+        self.retry_btn.setStyleSheet("font-size: 11px; padding: 2px 6px; background-color: #4f46e5; color: white; border: none; border-radius: 4px;")
+        self.retry_btn.clicked.connect(self._trigger_retry)
+        self.retry_btn.hide()
+        header_row.addWidget(self.retry_btn)
 
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setFixedSize(60, 24)
@@ -60,7 +79,19 @@ class JobCard(QFrame):
         # Detail text
         self.detail_lbl = QLabel(f"Engine: {job.engine} | Queued")
         self.detail_lbl.setStyleSheet("color: #8a8f98; font-size: 11px; background: transparent;")
+        self.detail_lbl.setWordWrap(True)
         layout.addWidget(self.detail_lbl)
+
+    def _open_output_folder(self):
+        dest = self.job.destination_path
+        if dest:
+            folder = dest if dest.is_dir() else dest.parent
+            if folder.exists():
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _trigger_retry(self):
+        if self.on_retry:
+            self.on_retry(self.job)
 
     def update_progress(self, progress: JobProgress):
         if progress.percentage is not None:
@@ -70,19 +101,28 @@ class JobCard(QFrame):
     def update_state(self, state: JobState):
         self.state_lbl.setText(state.value.capitalize())
         if state == JobState.COMPLETED:
-            self.state_lbl.setStyleSheet("background-color: #16a34a; color: white; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;")
+            self.state_lbl.setStyleSheet("background-color: #16a34a; color: white; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;")
             self.progress_bar.setValue(100)
             self.cancel_btn.setEnabled(False)
+            self.cancel_btn.hide()
+            self.open_btn.show()
+            warn_str = f" | Note: {'; '.join(self.job.warnings)}" if self.job.warnings else ""
+            self.detail_lbl.setText(f"Saved to: {self.job.destination_path}{warn_str}")
         elif state == JobState.FAILED:
-            self.state_lbl.setStyleSheet("background-color: #dc2626; color: white; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;")
+            self.state_lbl.setStyleSheet("background-color: #dc2626; color: white; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;")
             self.cancel_btn.setEnabled(False)
+            self.cancel_btn.hide()
+            self.retry_btn.show()
         elif state == JobState.CANCELLED:
-            self.state_lbl.setStyleSheet("background-color: #ca8a04; color: white; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;")
+            self.state_lbl.setStyleSheet("background-color: #ca8a04; color: white; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;")
             self.cancel_btn.setEnabled(False)
+            self.cancel_btn.hide()
+            self.retry_btn.show()
 
 
 class QueueManagerView(QWidget):
     """Queue dashboard monitoring all conversion tasks in progress and finished."""
+    retry_requested = Signal(dict)
 
     def __init__(self, job_manager: JobManager, parent=None):
         super().__init__(parent)
@@ -128,9 +168,19 @@ class QueueManagerView(QWidget):
 
     def add_job_card(self, job: ConversionJob):
         self.empty_lbl.hide()
-        card = JobCard(job, on_cancel=self.job_manager.cancel_job)
+        card = JobCard(job, on_cancel=self.job_manager.cancel_job, on_retry=self._on_retry_job)
         self.cards[job.id] = card
         self.cards_layout.insertWidget(0, card)
+
+    def _on_retry_job(self, old_job: ConversionJob):
+        if old_job.source_path.exists():
+            self.retry_requested.emit({
+                "source_path": old_job.source_path,
+                "operation_id": old_job.operation_id,
+                "target_format": old_job.target_format,
+                "engine": old_job.engine,
+                "settings": dict(old_job.settings or {}),
+            })
 
     @Slot(str, object)
     def _on_job_progress(self, job_id: str, progress: JobProgress):
@@ -145,4 +195,5 @@ class QueueManagerView(QWidget):
     @Slot(str, object)
     def _on_job_failed(self, job_id: str, error: JobError):
         if job_id in self.cards:
-            self.cards[job_id].detail_lbl.setText(f"Error: {error.message}")
+            step_prefix = f"[{error.step}] " if error.step else ""
+            self.cards[job_id].detail_lbl.setText(f"Error: {step_prefix}{error.message}")

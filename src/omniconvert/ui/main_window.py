@@ -1,17 +1,21 @@
 """Main desktop window for OmniConvert."""
 
 import logging
-import shutil
-from PySide6.QtCore import Qt, QThread, Signal
+from pathlib import Path
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
     QStackedWidget, QLabel, QStatusBar, QMessageBox, QButtonGroup
 )
 
 from omniconvert.config.settings import AppSettings
+from omniconvert.config.paths import get_icon_path
 from omniconvert.core.registry import CapabilityRegistry
 from omniconvert.core.job_manager import JobManager
+from omniconvert.core.history import HistoryManager
 from omniconvert.models.conversion_job import ConversionJob
+from omniconvert.engines.ffmpeg_detector import FFmpegDetector
 from omniconvert.ui.theme import get_theme_stylesheet
 from omniconvert.ui.home_view import HomeView
 from omniconvert.ui.conversion_workspace import ConversionWorkspaceView
@@ -22,16 +26,22 @@ from omniconvert.ui.views import (
 
 logger = logging.getLogger(__name__)
 
+
 class MainWindow(QMainWindow):
     def __init__(self, settings: AppSettings = None):
         super().__init__()
         self.settings = settings or AppSettings.load()
         self.registry = CapabilityRegistry()
         self.job_manager = JobManager(max_concurrent=self.settings.max_concurrent_jobs)
+        self.history_manager = HistoryManager(max_records=self.settings.history_limit)
 
         self.setWindowTitle("OmniConvert — Universal File Workspace")
-        self.resize(1024, 700)
-        self.setMinimumSize(850, 550)
+        self.resize(1100, 740)
+        self.setMinimumSize(880, 580)
+
+        icon_path = get_icon_path(prefer_ico=True)
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         self._apply_theme()
         self._init_ui()
@@ -53,6 +63,13 @@ class MainWindow(QMainWindow):
         self._apply_theme()
         logger.info("Theme toggled to %s", new_theme)
 
+    def _on_settings_updated(self, updated: AppSettings):
+        self.settings = updated
+        self.job_manager.thread_pool.setMaxThreadCount(updated.max_concurrent_jobs)
+        self.history_manager.max_records = updated.history_limit
+        if updated.default_output_dir and not self.conversion_view.output_dir_edit.text().strip():
+            self.conversion_view.output_dir_edit.setText(updated.default_output_dir)
+
     def _init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -64,15 +81,27 @@ class MainWindow(QMainWindow):
         # 1. Left Sidebar Navigation
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(225)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(12, 20, 12, 20)
         sidebar_layout.setSpacing(6)
 
-        # App Brand Title
-        brand_label = QLabel(" OmniConvert")
-        brand_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #3b82f6; padding-bottom: 12px;")
-        sidebar_layout.addWidget(brand_label)
+        # App Brand Header with Custom Icon
+        brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(4, 0, 4, 12)
+        icon_png = get_icon_path(prefer_ico=False)
+        if icon_png.exists():
+            icon_lbl = QLabel()
+            pix = QPixmap(str(icon_png)).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            icon_lbl.setPixmap(pix)
+            icon_lbl.setStyleSheet("background: transparent;")
+            brand_row.addWidget(icon_lbl)
+
+        brand_label = QLabel("OmniConvert")
+        brand_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #3b82f6; background: transparent;")
+        brand_row.addWidget(brand_label)
+        brand_row.addStretch()
+        sidebar_layout.addLayout(brand_row)
 
         # Nav Buttons
         self.nav_group = QButtonGroup(self)
@@ -103,7 +132,8 @@ class MainWindow(QMainWindow):
 
         # Engine quick status in sidebar footer
         self.engine_status_label = QLabel("Engines: Checking...")
-        self.engine_status_label.setStyleSheet("font-size: 11px; color: #8a8f98; padding: 4px;")
+        self.engine_status_label.setWordWrap(True)
+        self.engine_status_label.setStyleSheet("font-size: 11px; color: #8a8f98; padding: 4px; background: transparent;")
         sidebar_layout.addWidget(self.engine_status_label)
 
         root_layout.addWidget(sidebar)
@@ -112,16 +142,24 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
 
         self.home_view = HomeView()
-        self.conversion_view = ConversionWorkspaceView(registry=self.registry)
+        self.conversion_view = ConversionWorkspaceView(
+            registry=self.registry,
+            default_output_dir=self.settings.default_output_dir
+        )
         self.queue_view = QueueManagerView(job_manager=self.job_manager)
-        self.history_view = HistoryView()
-        self.explorer_view = FormatExplorerView()
-        self.settings_view = SettingsView(on_theme_toggle=self._toggle_theme)
+        self.history_view = HistoryView(history_manager=self.history_manager)
+        self.explorer_view = FormatExplorerView(registry=self.registry)
+        self.settings_view = SettingsView(
+            settings=self.settings,
+            on_theme_toggle=self._toggle_theme,
+            on_settings_changed=self._on_settings_updated
+        )
 
-        # Connect Home Drop signal to Conversion View
+        # Connect signals
         self.home_view.open_conversion.connect(self._on_files_received)
-        # Connect Conversion View Start button to Job Manager
         self.conversion_view.job_requested.connect(self._on_job_requested)
+        self.queue_view.retry_requested.connect(self._on_job_requested)
+        self.history_view.retry_requested.connect(self._on_job_requested)
 
         self.stack.addWidget(self.home_view)        # 0
         self.stack.addWidget(self.conversion_view)  # 1
@@ -135,13 +173,15 @@ class MainWindow(QMainWindow):
         # 3. Status Bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("OmniConvert Ready (Local processing only)")
+        self.status_bar.showMessage("OmniConvert Ready — 100% Local Offline Processing")
 
     def _connect_job_events(self):
         self.job_manager.signals.completed.connect(self._on_job_completed)
-        self.job_manager.signals.failed.connect(lambda jid, err: self.status_bar.showMessage(f"Job failed: {err.message}", 6000))
+        self.job_manager.signals.failed.connect(self._on_job_failed)
 
     def _on_nav_clicked(self, page_id: int):
+        if page_id == 3:
+            self.history_view.refresh()
         self.stack.setCurrentIndex(page_id)
 
     def _on_files_received(self, files: list):
@@ -151,11 +191,17 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage(f"Loaded {len(files)} file(s) into workspace", 5000)
 
     def _on_job_requested(self, req: dict):
+        dest_dir = req.get("destination_path")
+        if not dest_dir and self.settings.default_output_dir:
+            dest_dir = Path(self.settings.default_output_dir)
+
         job = ConversionJob(
-            source_path=req["source_path"],
+            source_path=Path(req["source_path"]),
             target_format=req["target_format"],
             operation_id=req["operation_id"],
-            engine=req["engine"]
+            engine=req["engine"],
+            settings=req.get("settings") or {},
+            destination_path=dest_dir
         )
         self.queue_view.add_job_card(job)
         self.job_manager.submit_job(job, collision_policy=self.settings.collision_policy)
@@ -166,14 +212,24 @@ class MainWindow(QMainWindow):
 
     def _on_job_completed(self, job_id: str, dest_path: str):
         self.status_bar.showMessage(f"Conversion completed: {dest_path}", 6000)
+        job = self.job_manager.get_job(job_id)
+        if job and self.settings.save_history:
+            self.history_manager.add_job(job)
+            self.history_view.refresh()
+
+    def _on_job_failed(self, job_id: str, err):
+        self.status_bar.showMessage(f"Job failed: {err.message}", 6000)
+        job = self.job_manager.get_job(job_id)
+        if job and self.settings.save_history:
+            self.history_manager.add_job(job)
+            self.history_view.refresh()
 
     def _check_system_dependencies(self):
-        has_ffmpeg = shutil.which("ffmpeg") is not None
-        if has_ffmpeg:
-            self.engine_status_label.setText("FFmpeg: Ready | Pillow: Ready")
-        else:
-            self.engine_status_label.setText("FFmpeg: Not Found | Pillow: Ready")
-            logger.info("FFmpeg binary not detected in PATH. Media transcoding disabled.")
+        has_ffmpeg = FFmpegDetector().detect().is_available
+        has_office = self.registry.is_engine_available("libreoffice")
+        ff_str = "Ready" if has_ffmpeg else "Missing"
+        off_str = "Ready" if has_office else "Missing"
+        self.engine_status_label.setText(f"FFmpeg: {ff_str} | PDF/Word: {off_str}\nImage/Data/Archive/TTS: Ready")
 
     def closeEvent(self, event):
         """Ensure safe shutdown when background jobs might be active."""

@@ -1,139 +1,395 @@
-"""Placeholder and workspace views for queue, history, settings, and format explorer."""
+"""Complete UI Views for Conversion History, Format Explorer, and Settings & Dependency Status."""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QPushButton, QHBoxLayout
+from pathlib import Path
+from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QComboBox,
+    QSpinBox, QCheckBox, QFileDialog, QFormLayout, QTextEdit
+)
 
-class ConversionView(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-
-        title = QLabel("Conversion Workspace")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        desc = QLabel("Inspect files, select operations, and configure outputs.")
-        desc.setStyleSheet("color: #8a8f98; font-size: 13px; margin-bottom: 15px;")
-        layout.addWidget(title)
-        layout.addWidget(desc)
-
-        card = QFrame()
-        card.setObjectName("card")
-        c_layout = QVBoxLayout(card)
-        self.file_label = QLabel("No files loaded. Drag and drop files from the Home view or browse.")
-        self.file_label.setStyleSheet("color: #8a8f98; font-style: italic; background: transparent;")
-        c_layout.addWidget(self.file_label)
-        layout.addWidget(card)
-        layout.addStretch()
-
-    def set_files(self, files: list):
-        if files:
-            self.file_label.setText(f"Loaded {len(files)} file(s):\n" + "\n".join(files[:5]))
-            if len(files) > 5:
-                self.file_label.setText(self.file_label.text() + f"\n...and {len(files)-5} more.")
-
-
-class QueueView(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-
-        title = QLabel("Job Queue & Execution")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        desc = QLabel("Active background conversion jobs and thread status.")
-        desc.setStyleSheet("color: #8a8f98; font-size: 13px; margin-bottom: 15px;")
-        layout.addWidget(title)
-        layout.addWidget(desc)
-
-        card = QFrame()
-        card.setObjectName("card")
-        c_layout = QVBoxLayout(card)
-        status_lbl = QLabel("No active jobs currently running.")
-        status_lbl.setStyleSheet("color: #8a8f98; background: transparent;")
-        c_layout.addWidget(status_lbl)
-        layout.addWidget(card)
-        layout.addStretch()
+from omniconvert.config.settings import AppSettings
+from omniconvert.core.history import HistoryManager, HistoryRecord
+from omniconvert.core.registry import CapabilityRegistry
+from omniconvert.engines.ffmpeg_detector import FFmpegDetector
+from omniconvert.engines.office_detector import LibreOfficeDetector
+from omniconvert.engines.ocr_engine import TesseractDetector
+from omniconvert.engines.speech_engine import SpeechDetector
 
 
 class HistoryView(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
+    """Interactive conversion history table with folder navigation, retry, and clear controls."""
+    retry_requested = Signal(dict)
 
+    def __init__(self, history_manager: HistoryManager = None, parent=None):
+        super().__init__(parent)
+        self.history_manager = history_manager or HistoryManager()
+        self.records: list[HistoryRecord] = []
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+
+        header_row = QHBoxLayout()
+        title_box = QVBoxLayout()
         title = QLabel("Conversion History")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        desc = QLabel("Recent conversion logs, completion timestamps, and quick destination links.")
-        desc.setStyleSheet("color: #8a8f98; font-size: 13px; margin-bottom: 15px;")
-        layout.addWidget(title)
-        layout.addWidget(desc)
+        desc = QLabel("Local audit log of completed and failed conversions (never stores file contents).")
+        desc.setStyleSheet("color: #8a8f98; font-size: 13px;")
+        title_box.addWidget(title)
+        title_box.addWidget(desc)
+        header_row.addLayout(title_box)
+        header_row.addStretch()
 
-        card = QFrame()
-        card.setObjectName("card")
-        c_layout = QVBoxLayout(card)
-        lbl = QLabel("No past conversion records yet.")
-        lbl.setStyleSheet("color: #8a8f98; background: transparent;")
-        c_layout.addWidget(lbl)
-        layout.addWidget(card)
-        layout.addStretch()
+        self.open_folder_btn = QPushButton("📂 Open Output Folder")
+        self.open_folder_btn.clicked.connect(self._open_selected_folder)
+        self.retry_btn = QPushButton("🔄 Retry Selected")
+        self.retry_btn.clicked.connect(self._retry_selected)
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.clicked.connect(self.refresh)
+        self.clear_btn = QPushButton("Clear History")
+        self.clear_btn.clicked.connect(self._clear_history)
+
+        header_row.addWidget(self.open_folder_btn)
+        header_row.addWidget(self.retry_btn)
+        header_row.addWidget(self.refresh_btn)
+        header_row.addWidget(self.clear_btn)
+        layout.addLayout(header_row)
+
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels([
+            "Timestamp", "Input File", "Operation", "Output", "Engine", "Status", "Duration / Details"
+        ])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid #2d3036;
+                border-radius: 6px;
+                background-color: #1a1b1f;
+                color: #e3e5e8;
+                gridline-color: #2d3036;
+            }
+            QHeaderView::section {
+                background-color: #22252a;
+                color: #9ba1a6;
+                padding: 6px;
+                border: 1px solid #2d3036;
+                font-weight: bold;
+            }
+        """)
+        layout.addWidget(self.table)
+
+        self.refresh()
+
+    def refresh(self):
+        self.records = self.history_manager.load_records()
+        self.table.setRowCount(len(self.records))
+        for r_idx, rec in enumerate(self.records):
+            detail = f"{rec.duration_seconds:.2f}s"
+            if rec.error_summary:
+                detail += f" | Error: {rec.error_summary}"
+            elif rec.destination_path:
+                detail += f" | {rec.destination_path}"
+
+            vals = [
+                rec.started_at,
+                rec.source_name,
+                rec.operation_id,
+                f".{rec.target_format.upper()}",
+                rec.engine,
+                rec.status.upper(),
+                detail
+            ]
+            for c_idx, val in enumerate(vals):
+                self.table.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
+
+    def _open_selected_folder(self):
+        row = self.table.currentRow()
+        if 0 <= row < len(self.records):
+            dest = Path(self.records[row].destination_path)
+            if dest.exists():
+                folder = dest if dest.is_dir() else dest.parent
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _retry_selected(self):
+        row = self.table.currentRow()
+        if 0 <= row < len(self.records):
+            rec = self.records[row]
+            src = Path(rec.source_path)
+            if src.exists():
+                self.retry_requested.emit({
+                    "source_path": src,
+                    "operation_id": rec.operation_id,
+                    "target_format": rec.target_format,
+                    "engine": rec.engine,
+                    "settings": {},
+                })
+
+    def _clear_history(self):
+        self.history_manager.clear()
+        self.refresh()
 
 
 class FormatExplorerView(QWidget):
-    def __init__(self, parent=None):
+    """Searchable Format Explorer and Capability Matrix."""
+
+    def __init__(self, registry: CapabilityRegistry = None, parent=None):
         super().__init__(parent)
+        self.registry = registry or CapabilityRegistry()
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
 
         title = QLabel("Format Explorer & Capability Matrix")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        desc = QLabel("Explore supported file formats, engines, limitations, and requirements.")
-        desc.setStyleSheet("color: #8a8f98; font-size: 13px; margin-bottom: 15px;")
+        desc = QLabel("Search all supported file formats, conversions, engines, lossiness, and limitations.")
+        desc.setStyleSheet("color: #8a8f98; font-size: 13px;")
         layout.addWidget(title)
         layout.addWidget(desc)
 
-        card = QFrame()
-        card.setObjectName("card")
-        c_layout = QVBoxLayout(card)
-        info = QLabel(
-            "Capabilities are dynamically registered.\n\n"
-            "• Images: PNG, JPEG, WEBP, BMP, ICO (Pillow Engine)\n"
-            "• Documents: PDF text extraction and merging (pypdf Engine)\n"
-            "• Media: Audio and video transcoding (FFmpeg Engine)\n"
-            "• Archives: ZIP, TAR extraction and compression (Archive Engine)"
-        )
-        info.setStyleSheet("background: transparent; line-height: 1.5;")
-        c_layout.addWidget(info)
-        layout.addWidget(card)
-        layout.addStretch()
+        # Filter bar
+        filter_row = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("🔍 Search by extension (e.g. pdf, docx, mp3, flac, png, 7z) or operation...")
+        self.search_edit.setStyleSheet("""
+            QLineEdit {
+                background-color: #1a1b1f;
+                border: 1px solid #3c424f;
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #f0f2f5;
+            }
+        """)
+        self.search_edit.textChanged.connect(self._populate_table)
+
+        self.category_combo = QComboBox()
+        self.category_combo.addItems(["All Categories", "image", "document", "audio", "video", "data", "text", "archive", "binary"])
+        self.category_combo.currentIndexChanged.connect(self._populate_table)
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItems(["All Statuses", "Available Only", "Unavailable / Optional Missing"])
+        self.status_combo.currentIndexChanged.connect(self._populate_table)
+
+        filter_row.addWidget(self.search_edit, stretch=1)
+        filter_row.addWidget(self.category_combo)
+        filter_row.addWidget(self.status_combo)
+        layout.addLayout(filter_row)
+
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels([
+            "Operation", "Input Formats", "Output", "Engine", "Fidelity", "Status", "Limitations / Notes"
+        ])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid #2d3036;
+                border-radius: 6px;
+                background-color: #1a1b1f;
+                color: #e3e5e8;
+                gridline-color: #2d3036;
+            }
+            QHeaderView::section {
+                background-color: #22252a;
+                color: #9ba1a6;
+                padding: 6px;
+                border: 1px solid #2d3036;
+                font-weight: bold;
+            }
+        """)
+        layout.addWidget(self.table)
+
+        self._populate_table()
+
+    def _populate_table(self):
+        query = self.search_edit.text().strip().lower()
+        cat_filter = self.category_combo.currentText().lower()
+        status_filter = self.status_combo.currentIndex()
+
+        all_caps = self.registry.get_all(only_available=False)
+        filtered = []
+        for cap in all_caps:
+            avail = self.registry.is_engine_available(cap.engine)
+            if status_filter == 1 and not avail:
+                continue
+            if status_filter == 2 and avail:
+                continue
+            if cat_filter != "all categories":
+                if cat_filter not in [c.lower() for c in cap.input_categories] and cat_filter != cap.output_category.lower():
+                    continue
+            haystack = f"{cap.id} {cap.display_name} {' '.join(cap.input_formats)} {cap.output_format} {cap.engine} {cap.description}".lower()
+            if query and query not in haystack:
+                continue
+            filtered.append((cap, avail))
+
+        self.table.setRowCount(len(filtered))
+        for r_idx, (cap, avail) in enumerate(filtered):
+            fidelity = "Lossy (Supports 100% Preset)" if cap.lossy else "Lossless"
+            status_txt = "✅ Ready" if avail else f"⚠️ Missing ({cap.engine})"
+            notes = "; ".join(cap.limitations) if cap.limitations else cap.description
+
+            row_vals = [
+                cap.display_name,
+                ", ".join(cap.input_formats[:8]) + ("..." if len(cap.input_formats) > 8 else ""),
+                f".{cap.output_format.upper()}",
+                cap.engine.upper(),
+                fidelity,
+                status_txt,
+                notes
+            ]
+            for c_idx, val in enumerate(row_vals):
+                self.table.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
 
 
 class SettingsView(QWidget):
-    def __init__(self, parent=None, on_theme_toggle=None):
-        super().__init__(parent)
-        self.on_theme_toggle = on_theme_toggle
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
+    """Settings and System Dependency Inspector View."""
 
-        title = QLabel("Settings & Preferences")
+    def __init__(self, settings: AppSettings = None, parent=None, on_theme_toggle=None, on_settings_changed=None):
+        super().__init__(parent)
+        self.settings = settings or AppSettings.load()
+        self.on_theme_toggle = on_theme_toggle
+        self.on_settings_changed = on_settings_changed
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+
+        title = QLabel("Settings & System Dependencies")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        desc = QLabel("Manage output paths, collision policies, concurrent jobs, and UI themes.")
-        desc.setStyleSheet("color: #8a8f98; font-size: 13px; margin-bottom: 15px;")
+        desc = QLabel("Configure output directories, collision rules, concurrency, themes, and inspect local engines.")
+        desc.setStyleSheet("color: #8a8f98; font-size: 13px;")
         layout.addWidget(title)
         layout.addWidget(desc)
 
+        # Preferences Card
         card = QFrame()
         card.setObjectName("card")
-        c_layout = QVBoxLayout(card)
-        
+        form = QFormLayout(card)
+        form.setSpacing(10)
+
+        # Theme
         theme_row = QHBoxLayout()
-        theme_lbl = QLabel("Interface Theme:")
-        theme_lbl.setStyleSheet("font-weight: 500; background: transparent;")
         self.toggle_theme_btn = QPushButton("Toggle Dark / Light Theme")
         if self.on_theme_toggle:
             self.toggle_theme_btn.clicked.connect(self.on_theme_toggle)
-        theme_row.addWidget(theme_lbl)
-        theme_row.addStretch()
         theme_row.addWidget(self.toggle_theme_btn)
+        theme_row.addStretch()
+        form.addRow("Interface Theme:", theme_row)
 
-        c_layout.addLayout(theme_row)
+        # Default Output Folder
+        out_row = QHBoxLayout()
+        self.out_dir_edit = QLineEdit(self.settings.default_output_dir)
+        self.out_dir_edit.setPlaceholderText("Leave empty to use source file's folder")
+        self.out_dir_edit.textChanged.connect(self._save_preferences)
+        browse_btn = QPushButton("Browse...")
+        browse_btn.clicked.connect(self._browse_dir)
+        out_row.addWidget(self.out_dir_edit, stretch=1)
+        out_row.addWidget(browse_btn)
+        form.addRow("Default Output Folder:", out_row)
+
+        # Collision policy
+        self.collision_combo = QComboBox()
+        self.collision_combo.addItems(["rename", "overwrite", "ask"])
+        self.collision_combo.setCurrentText(self.settings.collision_policy)
+        self.collision_combo.currentTextChanged.connect(self._save_preferences)
+        form.addRow("Filename Collision Policy:", self.collision_combo)
+
+        # Max Concurrent Jobs
+        self.concurrent_spin = QSpinBox()
+        self.concurrent_spin.setRange(1, 8)
+        self.concurrent_spin.setValue(self.settings.max_concurrent_jobs)
+        self.concurrent_spin.valueChanged.connect(self._save_preferences)
+        form.addRow("Max Concurrent Jobs:", self.concurrent_spin)
+
+        # History settings
+        hist_row = QHBoxLayout()
+        self.save_history_chk = QCheckBox("Record conversion history locally")
+        self.save_history_chk.setChecked(self.settings.save_history)
+        self.save_history_chk.toggled.connect(self._save_preferences)
+        self.history_limit_spin = QSpinBox()
+        self.history_limit_spin.setRange(10, 2000)
+        self.history_limit_spin.setValue(self.settings.history_limit)
+        self.history_limit_spin.valueChanged.connect(self._save_preferences)
+        hist_row.addWidget(self.save_history_chk)
+        hist_row.addSpacing(16)
+        hist_row.addWidget(QLabel("Max Records:"))
+        hist_row.addWidget(self.history_limit_spin)
+        hist_row.addStretch()
+        form.addRow("History Retention:", hist_row)
+
         layout.addWidget(card)
-        layout.addStretch()
+
+        # Dependency & Privacy Status Card
+        dep_card = QFrame()
+        dep_card.setObjectName("card")
+        dep_layout = QVBoxLayout(dep_card)
+        dep_title = QLabel("Local Engine & Dependency Status Report")
+        dep_title.setStyleSheet("font-weight: bold; font-size: 14px; background: transparent;")
+        dep_layout.addWidget(dep_title)
+
+        self.dep_report_text = QTextEdit()
+        self.dep_report_text.setReadOnly(True)
+        self.dep_report_text.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #2d3036;
+                border-radius: 6px;
+                background-color: #1a1b1f;
+                color: #cfd5dc;
+                font-family: 'Consolas', monospace;
+                font-size: 12px;
+            }
+        """)
+        dep_layout.addWidget(self.dep_report_text)
+        layout.addWidget(dep_card)
+
+        self._refresh_dependency_report()
+
+    def _browse_dir(self):
+        folder = QFileDialog.getExistingDirectory(self, "Choose Default Output Folder")
+        if folder:
+            self.out_dir_edit.setText(folder)
+
+    def _save_preferences(self):
+        self.settings.default_output_dir = self.out_dir_edit.text().strip()
+        self.settings.collision_policy = self.collision_combo.currentText()  # type: ignore
+        self.settings.max_concurrent_jobs = self.concurrent_spin.value()
+        self.settings.save_history = self.save_history_chk.isChecked()
+        self.settings.history_limit = self.history_limit_spin.value()
+        self.settings.save()
+        if self.on_settings_changed:
+            self.on_settings_changed(self.settings)
+
+    def _refresh_dependency_report(self):
+        ff_info = FFmpegDetector().detect()
+        lo_info = LibreOfficeDetector().detect()
+        ocr_info = TesseractDetector().detect()
+        sp_info = SpeechDetector().detect()
+
+        lines = [
+            "=== Required & Built-In Local Engines ===",
+            "✅ Image Engine (Pillow + PyMuPDF SVG): Ready",
+            "✅ PDF & Word Engine (pypdf + PyMuPDF + pdf2docx + python-docx + ReportLab): Ready (PDF <-> DOCX, PDF <-> Image/HTML/MD)",
+            "✅ Office Spreadsheet & Slide Engine (openpyxl + python-pptx): Ready (XLSX <-> PDF/CSV/JSON, PPTX -> PDF/TXT)",
+            "✅ Archive Engine (zipfile + tarfile + gzip + py7zr): Ready (ZIP, TAR, TAR.GZ, GZ, 7Z with Zip-Slip & Bomb Protection)",
+            "✅ Structured Data & Static Binary Engine (JSON, YAML, XML, CSV, Strings, SHA-256, PE Headers): Ready",
+            f"{'✅' if ff_info.is_available else '⚠️'} Media Engine (FFmpeg / FFprobe): "
+            + (f"Ready (v{ff_info.ffmpeg_version} at {ff_info.ffmpeg_path})" if ff_info.is_available else f"Missing ({ff_info.error_message})"),
+            f"✅ Local Text-to-Speech (TTS): Ready ({sp_info.tts_engine_name})",
+            "",
+            "=== Optional External Engines ===",
+            f"{'✅' if lo_info.is_available else 'ℹ️'} LibreOffice Headless: "
+            + (f"Installed (v{lo_info.version})" if lo_info.is_available else "Not installed (Using built-in Python DOCX/XLSX/PPTX/PDF engine instead)"),
+            f"{'✅' if ocr_info.is_available else 'ℹ️'} Local OCR (Tesseract): "
+            + (f"Installed ({ocr_info.version}, langs={','.join(ocr_info.languages)})" if ocr_info.is_available else "Not installed (Install via `winget install UB-Mannheim.TesseractOCR`)"),
+            f"{'✅' if sp_info.asr_available else 'ℹ️'} Local Speech Recognition (ASR): "
+            + ("Installed" if sp_info.asr_available else "Not installed (Optional: `pip install faster-whisper`)"),
+            "",
+            "=== Privacy & Security Policy ===",
+            "🔒 100% Local Processing: All conversions execute strictly on this machine. No files, paths, or telemetry are ever uploaded."
+        ]
+        self.dep_report_text.setText("\n".join(lines))
