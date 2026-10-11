@@ -14,6 +14,7 @@ from omniconvert.core.validation import validate_output
 from omniconvert.engines.base import BaseEngine
 from omniconvert.engines.data_engine import DataEngine
 from omniconvert.engines.ffmpeg_engine import FFmpegEngine
+from omniconvert.engines.image_engine import ImageEngine
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,7 @@ class JobManager(QObject):
 
         # Register default baseline engines
         self.register_engine(DataEngine())
+        self.register_engine(ImageEngine())
         ffmpeg_eng = FFmpegEngine()
         if ffmpeg_eng.is_available():
             self.register_engine(ffmpeg_eng)

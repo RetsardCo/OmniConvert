@@ -105,7 +105,7 @@ class CapabilityRegistry:
             display_name="Convert to PNG",
             description="Convert raster image to lossless PNG format.",
             input_categories=["image"],
-            input_formats=["jpeg", "webp", "bmp", "tiff", "ico"],
+            input_formats=["jpeg", "jpg", "webp", "bmp", "tiff", "ico", "gif"],
             output_category="image",
             output_format="png",
             engine="pillow",
@@ -118,7 +118,7 @@ class CapabilityRegistry:
             display_name="Convert to WebP",
             description="Convert raster image to modern WebP format.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "bmp", "tiff"],
+            input_formats=["png", "jpeg", "jpg", "bmp", "tiff"],
             output_category="image",
             output_format="webp",
             engine="pillow",
@@ -131,11 +131,38 @@ class CapabilityRegistry:
         ))
 
         self.register(Capability(
+            id="image.to_bmp",
+            display_name="Convert to BMP",
+            description="Convert raster image to uncompressed Windows Bitmap.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "tiff"],
+            output_category="image",
+            output_format="bmp",
+            engine="pillow",
+            operation="convert_image",
+            lossy=True,
+            limitations=["BMP does not preserve transparency."]
+        ))
+
+        self.register(Capability(
+            id="image.to_tiff",
+            display_name="Convert to TIFF",
+            description="Convert raster image to TIFF format.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp"],
+            output_category="image",
+            output_format="tiff",
+            engine="pillow",
+            operation="convert_image",
+            lossy=False
+        ))
+
+        self.register(Capability(
             id="image.to_ico",
             display_name="Generate Windows Icon (.ico)",
             description="Create multi-resolution Windows icon file.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "bmp"],
+            input_formats=["png", "jpeg", "jpg", "bmp"],
             output_category="image",
             output_format="ico",
             engine="pillow",

@@ -165,24 +165,24 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ## Phase 5 — Image Engine
 
-- [ ] Integrate Pillow.
-- [ ] Detect supported image formats.
-- [ ] Implement PNG-to-JPEG.
-- [ ] Implement JPEG-to-PNG.
-- [ ] Implement WEBP conversions where supported.
-- [ ] Implement BMP and TIFF operations where supported.
-- [ ] Implement image resizing.
-- [ ] Implement image rotation and cropping.
-- [ ] Implement image compression or quality settings where applicable.
-- [ ] Implement GIF frame extraction where supported.
-- [ ] Implement ICO generation.
-- [ ] Handle transparency and warn when the target format cannot preserve it.
-- [ ] Preserve or strip metadata according to explicit settings.
-- [ ] Add output validation by reopening images and checking expected properties.
-- [ ] Test corrupt images, unusual dimensions, and unsupported formats.
+- [x] Integrate Pillow.
+- [x] Detect supported image formats.
+- [x] Implement PNG-to-JPEG.
+- [x] Implement JPEG-to-PNG.
+- [x] Implement WEBP conversions where supported.
+- [x] Implement BMP and TIFF operations where supported.
+- [x] Implement image resizing.
+- [x] Implement image rotation and cropping.
+- [x] Implement image compression or quality settings where applicable.
+- [x] Implement GIF frame extraction where supported.
+- [x] Implement ICO generation.
+- [x] Handle transparency and warn when the target format cannot preserve it.
+- [x] Preserve or strip metadata according to explicit settings.
+- [x] Add output validation by reopening images and checking expected properties.
+- [x] Test corrupt images, unusual dimensions, and unsupported formats.
 
 **Acceptance criteria**
-- [ ] Each registered image operation has tests and handles transparency and output validation correctly.
+- [x] Each registered image operation has tests and handles transparency and output validation correctly.
 
 ---
 
