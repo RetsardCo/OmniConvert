@@ -1,0 +1,33 @@
+# OmniConvert — Virtual Environment & Build Artifacts
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# Distribution & Packaging
+build/
+dist/
+*.egg-info/
+
+# PyTest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Temporary Files
+*.log
+temp/
+tmp/
+output/
+.omni_temp/
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
