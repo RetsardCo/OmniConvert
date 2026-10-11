@@ -124,42 +124,42 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 ## Phase 4 — FFmpeg and Media Engine
 
 ### Dependency integration
-- [ ] Detect FFmpeg.
-- [ ] Detect FFprobe.
-- [ ] Read and report installed versions.
-- [ ] Detect missing executables and show actionable instructions.
-- [ ] Check relevant codecs and capabilities rather than assuming every build supports every codec.
+- [x] Detect FFmpeg.
+- [x] Detect FFprobe.
+- [x] Read and report installed versions.
+- [x] Detect missing executables and show actionable instructions.
+- [x] Check relevant codecs and capabilities rather than assuming every build supports every codec.
 
 ### Media inspection
-- [ ] Inspect media containers and streams.
-- [ ] Detect audio and video streams.
-- [ ] Read duration, dimensions, sample rate, channel count, and available metadata when present.
-- [ ] Handle files with no audio stream or no video stream.
-- [ ] Handle malformed or unsupported media with useful errors.
+- [x] Inspect media containers and streams.
+- [x] Detect audio and video streams.
+- [x] Read duration, dimensions, sample rate, channel count, and available metadata when present.
+- [x] Handle files with no audio stream or no video stream.
+- [x] Handle malformed or unsupported media with useful errors.
 
 ### Initial audio/video operations
-- [ ] Implement video-to-MP4 using a defined preset.
-- [ ] Implement video-to-MKV where supported.
-- [ ] Implement video-to-MP3.
-- [ ] Implement video-to-WAV.
-- [ ] Implement audio-to-MP3.
-- [ ] Implement audio-to-WAV.
-- [ ] Implement supported audio-to-FLAC.
-- [ ] Implement supported video compression settings.
-- [ ] Implement supported audio bitrate and sample-rate settings.
-- [ ] Implement subtitle extraction where a suitable stream exists.
-- [ ] Implement video-to-GIF or frame extraction as a defined operation.
-- [ ] Report lossy conversion and stream-selection behavior.
+- [x] Implement video-to-MP4 using a defined preset.
+- [x] Implement video-to-MKV where supported.
+- [x] Implement video-to-MP3.
+- [x] Implement video-to-WAV.
+- [x] Implement audio-to-MP3.
+- [x] Implement audio-to-WAV.
+- [x] Implement supported audio-to-FLAC.
+- [x] Implement supported video compression settings.
+- [x] Implement supported audio bitrate and sample-rate settings.
+- [x] Implement subtitle extraction where a suitable stream exists.
+- [x] Implement video-to-GIF or frame extraction as a defined operation.
+- [x] Report lossy conversion and stream-selection behavior.
 
 ### Media validation
-- [ ] Verify output streams with FFprobe.
-- [ ] Decode or inspect representative output files.
-- [ ] Test missing-stream and corrupt-input cases.
-- [ ] Test cancellation and large-file behavior.
-- [ ] Verify progress reporting is honest when exact progress is unavailable.
+- [x] Verify output streams with FFprobe.
+- [x] Decode or inspect representative output files.
+- [x] Test missing-stream and corrupt-input cases.
+- [x] Test cancellation and large-file behavior.
+- [x] Verify progress reporting is honest when exact progress is unavailable.
 
 **Acceptance criteria**
-- [ ] Representative media operations pass automated integration tests and validate their outputs.
+- [x] Representative media operations pass automated integration tests and validate their outputs.
 
 ---
 

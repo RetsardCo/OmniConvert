@@ -67,4 +67,20 @@ def validate_output(
         except Exception as e:
             return False, f"Generated ZIP archive is invalid: {e}"
 
+    elif fmt in ("mp3", "wav", "flac", "aac", "ogg", "mp4", "mkv", "avi", "mov", "webm", "gif"):
+        try:
+            from omniconvert.engines.media_inspector import MediaInspector
+            inspector = MediaInspector()
+            if inspector.ffprobe_path and inspector.ffprobe_path.exists():
+                res = inspector.inspect(target_path)
+                if not res.is_valid:
+                    return False, f"Generated media is corrupt: {res.error_message}"
+                if fmt in ("mp3", "wav", "flac", "aac", "ogg") and not res.has_audio:
+                    return False, "Generated audio file contains no readable audio stream."
+                if fmt in ("mp4", "mkv", "avi", "mov", "webm") and not res.has_video:
+                    return False, "Generated video file contains no readable video stream."
+        except Exception as e:
+            # If inspection tools fail internally, don't crash, report failure
+            return False, f"Could not verify media output stream: {e}"
+
     return True, None

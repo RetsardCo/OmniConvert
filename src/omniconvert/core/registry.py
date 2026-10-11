@@ -218,9 +218,48 @@ class CapabilityRegistry:
         ))
 
         self.register(Capability(
+            id="audio.to_mp3",
+            display_name="Convert Audio to MP3",
+            description="Transcode audio to widely compatible MP3 format.",
+            input_categories=["audio"],
+            input_formats=["wav", "flac", "aac", "ogg", "m4a"],
+            output_category="audio",
+            output_format="mp3",
+            engine="ffmpeg",
+            operation="convert_audio",
+            lossy=True
+        ))
+
+        self.register(Capability(
+            id="audio.to_wav",
+            display_name="Convert Audio to WAV",
+            description="Decode audio to uncompressed PCM WAV format.",
+            input_categories=["audio"],
+            input_formats=["mp3", "flac", "aac", "ogg", "m4a"],
+            output_category="audio",
+            output_format="wav",
+            engine="ffmpeg",
+            operation="convert_audio",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="audio.to_flac",
+            display_name="Convert Audio to FLAC",
+            description="Encode audio to lossless FLAC format.",
+            input_categories=["audio"],
+            input_formats=["wav", "mp3", "aac", "ogg"],
+            output_category="audio",
+            output_format="flac",
+            engine="ffmpeg",
+            operation="convert_audio",
+            lossy=False
+        ))
+
+        self.register(Capability(
             id="video.to_mp4",
             display_name="Transcode to MP4 (H.264/AAC)",
-            description="Re-encode or remux video into standard MP4 container.",
+            description="Re-encode video into standard MP4 container.",
             input_categories=["video"],
             input_formats=["mkv", "avi", "mov", "webm"],
             output_category="video",
@@ -228,6 +267,47 @@ class CapabilityRegistry:
             engine="ffmpeg",
             operation="transcode_video",
             lossy=True
+        ))
+
+        self.register(Capability(
+            id="video.to_mkv",
+            display_name="Transcode to MKV",
+            description="Transcode video into Matroska container.",
+            input_categories=["video"],
+            input_formats=["mp4", "avi", "mov", "webm"],
+            output_category="video",
+            output_format="mkv",
+            engine="ffmpeg",
+            operation="transcode_video",
+            lossy=True
+        ))
+
+        self.register(Capability(
+            id="video.to_gif",
+            display_name="Convert Video to Animated GIF",
+            description="Extract and optimize frames into an animated GIF.",
+            input_categories=["video"],
+            input_formats=["mp4", "mkv", "avi", "mov", "webm"],
+            output_category="image",
+            output_format="gif",
+            engine="ffmpeg",
+            operation="video_to_gif",
+            lossy=True,
+            limitations=["GIF format is limited to 256 colors."]
+        ))
+
+        self.register(Capability(
+            id="video.extract_subtitles",
+            display_name="Extract Subtitles to SRT",
+            description="Extract text subtitle track from video container.",
+            input_categories=["video"],
+            input_formats=["mkv", "mp4"],
+            output_category="text",
+            output_format="srt",
+            engine="ffmpeg",
+            operation="extract_subtitles",
+            lossy=False,
+            limitations=["Source video must contain an embedded subtitle track."]
         ))
 
         # 5. Archive (Archive Engine)
