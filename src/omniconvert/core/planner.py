@@ -68,7 +68,11 @@ class WorkflowPlanner:
                 if not out_fmt or out_fmt == "dir":
                     continue
 
-                # Avoid cycles (unless 1-step format normalization like txt -> txt)
+                # Do not use archive packaging as an intermediate step unless the target itself is an archive
+                if cap.output_category == "archive" and out_fmt != dst:
+                    continue
+
+                # Avoid cycles (unless 1-step format normalization like txt -> txt or pdf -> pdf)
                 if out_fmt in visited and not (len(path_caps) == 0 and out_fmt == dst):
                     continue
 

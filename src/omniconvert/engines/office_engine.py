@@ -160,7 +160,7 @@ class OfficeEngine(BaseEngine):
             str(source)
         ]
 
-        res = self._runner.run(args, timeout=120.0)
+        res = self._runner.run(args, timeout=120.0, is_cancelled=is_cancelled)
         if res.cancelled or (is_cancelled and is_cancelled()):
             raise InterruptedError("Job cancelled by user.")
         if res.timed_out:
@@ -178,6 +178,25 @@ class OfficeEngine(BaseEngine):
                 raise FileNotFoundError(f"Expected converted document not found in workspace: {expected_target}")
         return expected_target
 
+    def _iter_docx_blocks(self, doc):
+        """Yield ('paragraph', Paragraph) and ('table', Table) in exact document body order."""
+        from docx.text.paragraph import Paragraph as DocxParagraph
+        from docx.table import Table as DocxTable
+
+        if hasattr(doc, "iter_inner_content"):
+            for item in doc.iter_inner_content():
+                if isinstance(item, DocxParagraph):
+                    yield "paragraph", item
+                elif isinstance(item, DocxTable):
+                    yield "table", item
+            return
+
+        for child in doc.element.body.iterchildren():
+            if child.tag.endswith("}p"):
+                yield "paragraph", DocxParagraph(child, doc)
+            elif child.tag.endswith("}tbl"):
+                yield "table", DocxTable(child, doc)
+
     def _docx_to_pdf(
         self,
         source: Path,
@@ -192,7 +211,7 @@ class OfficeEngine(BaseEngine):
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
 
         target_file = workspace_dir / f"{source.stem}.pdf"
         try:
@@ -264,72 +283,72 @@ class OfficeEngine(BaseEngine):
             except Exception:
                 pass
 
-        # Iterate through document body elements in order (paragraphs and tables)
-        total_paras = max(len(doc.paragraphs), 1)
-        for idx, para in enumerate(doc.paragraphs):
+        # Iterate through document body elements in exact document order (interleaved paragraphs and tables)
+        blocks = list(self._iter_docx_blocks(doc))
+        total_blocks = max(len(blocks), 1)
+        for idx, (b_type, block) in enumerate(blocks):
             if is_cancelled and is_cancelled():
                 raise InterruptedError("Cancelled during DOCX-to-PDF conversion.")
 
-            text = para.text.strip()
-            if not text:
-                story.append(Spacer(1, 6))
-                continue
-
-            style_name = (para.style.name if para.style else "Normal").lower()
-            # Build inline markup from runs
-            formatted_runs = []
-            for run in para.runs:
-                r_txt = html.escape(run.text)
-                if not r_txt:
+            if b_type == "paragraph":
+                para = block
+                text = para.text.strip()
+                if not text:
+                    story.append(Spacer(1, 6))
                     continue
-                if run.bold:
-                    r_txt = f"<b>{r_txt}</b>"
-                if run.italic:
-                    r_txt = f"<i>{r_txt}</i>"
-                if run.underline:
-                    r_txt = f"<u>{r_txt}</u>"
-                formatted_runs.append(r_txt)
 
-            markup = "".join(formatted_runs) if formatted_runs else html.escape(text)
-            markup = markup.replace("\n", "<br/>")
+                style_name = (para.style.name if para.style else "Normal").lower()
+                formatted_runs = []
+                for run in para.runs:
+                    r_txt = html.escape(run.text)
+                    if not r_txt:
+                        continue
+                    if run.bold:
+                        r_txt = f"<b>{r_txt}</b>"
+                    if run.italic:
+                        r_txt = f"<i>{r_txt}</i>"
+                    if run.underline:
+                        r_txt = f"<u>{r_txt}</u>"
+                    formatted_runs.append(r_txt)
 
-            if "heading 1" in style_name or "title" in style_name:
-                story.append(Paragraph(markup, h1_style))
-            elif "heading 2" in style_name:
-                story.append(Paragraph(markup, h2_style))
-            elif "heading 3" in style_name:
-                story.append(Paragraph(markup, h3_style))
-            else:
-                story.append(Paragraph(markup, body_style))
+                markup = "".join(formatted_runs) if formatted_runs else html.escape(text)
+                markup = markup.replace("\n", "<br/>")
+
+                if "heading 1" in style_name or "title" in style_name:
+                    story.append(Paragraph(markup, h1_style))
+                elif "heading 2" in style_name:
+                    story.append(Paragraph(markup, h2_style))
+                elif "heading 3" in style_name:
+                    story.append(Paragraph(markup, h3_style))
+                else:
+                    story.append(Paragraph(markup, body_style))
+
+            elif b_type == "table":
+                tbl = block
+                table_data = []
+                for row in tbl.rows:
+                    row_cells = [Paragraph(html.escape(cell.text.strip()), body_style) for cell in row.cells]
+                    if row_cells:
+                        table_data.append(row_cells)
+                if table_data:
+                    t = Table(table_data, repeatRows=1)
+                    t.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
+                        ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("PADDING", (0, 0), (-1, -1), 6),
+                    ]))
+                    story.append(Spacer(1, 8))
+                    story.append(t)
+                    story.append(Spacer(1, 8))
 
             if progress_callback and idx % 10 == 0:
                 progress_callback(JobProgress(
-                    percentage=20.0 + (idx / total_paras) * 50.0,
-                    stage="Formatting Paragraphs",
-                    detail=f"Paragraph {idx + 1}/{total_paras}"
+                    percentage=20.0 + (idx / total_blocks) * 50.0,
+                    stage="Formatting Document Elements",
+                    detail=f"Element {idx + 1}/{total_blocks}"
                 ))
-
-        # Render tables
-        for tbl in doc.tables:
-            if is_cancelled and is_cancelled():
-                raise InterruptedError("Cancelled during table rendering.")
-            table_data = []
-            for row in tbl.rows:
-                row_cells = [Paragraph(html.escape(cell.text.strip()), body_style) for cell in row.cells]
-                if row_cells:
-                    table_data.append(row_cells)
-            if table_data:
-                t = Table(table_data, repeatRows=1)
-                t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
-                    ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("PADDING", (0, 0), (-1, -1), 6),
-                ]))
-                story.append(Spacer(1, 8))
-                story.append(t)
-                story.append(Spacer(1, 8))
 
         # Append embedded images preserving aspect ratio
         for img_p in embedded_images:
@@ -363,10 +382,13 @@ class OfficeEngine(BaseEngine):
         import docx
         target_file = workspace_dir / f"{source.stem}.txt"
         doc = docx.Document(str(source))
-        lines = [p.text for p in doc.paragraphs]
-        for tbl in doc.tables:
-            for row in tbl.rows:
-                lines.append("\t".join(c.text.strip() for c in row.cells))
+        lines = []
+        for b_type, block in self._iter_docx_blocks(doc):
+            if b_type == "paragraph":
+                lines.append(block.text)
+            elif b_type == "table":
+                for row in block.rows:
+                    lines.append("\t".join(c.text.strip() for c in row.cells))
         content = "\n".join(lines)
         if not content.strip():
             content = " "
@@ -390,25 +412,27 @@ class OfficeEngine(BaseEngine):
             "table{border-collapse:collapse;width:100%;margin:16px 0;}th,td{border:1px solid #d1d5db;padding:8px;text-align:left;}</style>",
             "</head><body>"
         ]
-        for p in doc.paragraphs:
-            txt = html.escape(p.text)
-            if not txt.strip():
-                continue
-            sname = (p.style.name if p.style else "").lower()
-            if "heading 1" in sname or "title" in sname:
-                parts.append(f"<h1>{txt}</h1>")
-            elif "heading 2" in sname:
-                parts.append(f"<h2>{txt}</h2>")
-            elif "heading 3" in sname:
-                parts.append(f"<h3>{txt}</h3>")
-            else:
-                parts.append(f"<p>{txt}</p>")
-        for tbl in doc.tables:
-            parts.append("<table>")
-            for r in tbl.rows:
-                cells = "".join(f"<td>{html.escape(c.text.strip())}</td>" for c in r.cells)
-                parts.append(f"<tr>{cells}</tr>")
-            parts.append("</table>")
+        for b_type, block in self._iter_docx_blocks(doc):
+            if b_type == "paragraph":
+                p = block
+                txt = html.escape(p.text)
+                if not txt.strip():
+                    continue
+                sname = (p.style.name if p.style else "").lower()
+                if "heading 1" in sname or "title" in sname:
+                    parts.append(f"<h1>{txt}</h1>")
+                elif "heading 2" in sname:
+                    parts.append(f"<h2>{txt}</h2>")
+                elif "heading 3" in sname:
+                    parts.append(f"<h3>{txt}</h3>")
+                else:
+                    parts.append(f"<p>{txt}</p>")
+            elif b_type == "table":
+                parts.append("<table>")
+                for r in block.rows:
+                    cells = "".join(f"<td>{html.escape(c.text.strip())}</td>" for c in r.cells)
+                    parts.append(f"<tr>{cells}</tr>")
+                parts.append("</table>")
         parts.append("</body></html>")
         target_file.write_text("\n".join(parts), encoding="utf-8")
         return target_file
@@ -424,22 +448,34 @@ class OfficeEngine(BaseEngine):
         target_file = workspace_dir / f"{source.stem}.md"
         doc = docx.Document(str(source))
         lines = []
-        for p in doc.paragraphs:
-            txt = p.text.strip()
-            if not txt:
-                lines.append("")
-                continue
-            sname = (p.style.name if p.style else "").lower()
-            if "heading 1" in sname or "title" in sname:
-                lines.append(f"# {txt}")
-            elif "heading 2" in sname:
-                lines.append(f"## {txt}")
-            elif "heading 3" in sname:
-                lines.append(f"### {txt}")
-            elif "list" in sname:
-                lines.append(f"- {txt}")
-            else:
-                lines.append(txt)
+        for b_type, block in self._iter_docx_blocks(doc):
+            if b_type == "paragraph":
+                p = block
+                txt = p.text.strip()
+                if not txt:
+                    continue
+                sname = (p.style.name if p.style else "").lower()
+                if "heading 1" in sname or "title" in sname:
+                    lines.append(f"# {txt}")
+                elif "heading 2" in sname:
+                    lines.append(f"## {txt}")
+                elif "heading 3" in sname:
+                    lines.append(f"### {txt}")
+                elif "list" in sname:
+                    lines.append(f"- {txt}")
+                else:
+                    lines.append(txt)
+            elif b_type == "table":
+                md_rows = []
+                for r_idx, row in enumerate(block.rows):
+                    cell_texts = [c.text.strip().replace("\n", " ").replace("|", "\\|") for c in row.cells]
+                    if not cell_texts:
+                        continue
+                    md_rows.append("| " + " | ".join(cell_texts) + " |")
+                    if r_idx == 0:
+                        md_rows.append("| " + " | ".join("---" for _ in cell_texts) + " |")
+                if md_rows:
+                    lines.append("\n".join(md_rows))
         content = "\n\n".join(lines).strip() or f"# {source.stem}"
         target_file.write_text(content + "\n", encoding="utf-8")
         return target_file
@@ -623,6 +659,7 @@ class OfficeEngine(BaseEngine):
 
     def _data_to_xlsx(self, source: Path, src_ext: str, workspace_dir: Path, progress_callback=None, is_cancelled=None) -> Path:
         import openpyxl
+        from openpyxl.styles import Font
         target_file = workspace_dir / f"{source.stem}.xlsx"
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -644,14 +681,19 @@ class OfficeEngine(BaseEngine):
                 for item in data:
                     ws.append([str(item.get(h, "")) if isinstance(item.get(h), (dict, list)) else item.get(h, "") for h in headers])
 
+        if ws.max_row >= 1:
+            for cell in ws[1]:
+                cell.font = Font(bold=True)
+
         wb.save(str(target_file))
         return target_file
 
     def _pptx_to_pdf(self, source: Path, workspace_dir: Path, settings: Dict[str, Any], progress_callback=None, is_cancelled=None) -> Path:
         from pptx import Presentation
         from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
 
         target_file = workspace_dir / f"{source.stem}.pdf"
         prs = Presentation(str(source))
@@ -665,12 +707,30 @@ class OfficeEngine(BaseEngine):
             story.append(Paragraph(f"<b>Slide {idx + 1}</b>", styles["Heading2"]))
             story.append(Spacer(1, 10))
             for shape in slide.shapes:
-                if shape.has_text_frame:
+                if getattr(shape, "has_text_frame", False):
                     for p in shape.text_frame.paragraphs:
                         txt = p.text.strip()
                         if txt:
                             story.append(Paragraph(html.escape(txt), styles["Normal"]))
                             story.append(Spacer(1, 4))
+                if getattr(shape, "has_table", False):
+                    rows_data = []
+                    for row in shape.table.rows:
+                        rows_data.append([Paragraph(html.escape(cell.text.strip()), styles["Normal"]) for cell in row.cells])
+                    if rows_data:
+                        t = Table(rows_data, repeatRows=1)
+                        t.setStyle(TableStyle([
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e5e7eb")),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
+                            ("PADDING", (0, 0), (-1, -1), 5),
+                        ]))
+                        story.append(t)
+                        story.append(Spacer(1, 8))
+            if getattr(slide, "has_notes_slide", False) and slide.notes_slide and slide.notes_slide.notes_text_frame:
+                notes_txt = slide.notes_slide.notes_text_frame.text.strip()
+                if notes_txt:
+                    story.append(Spacer(1, 6))
+                    story.append(Paragraph(f"<i>Speaker Notes: {html.escape(notes_txt)}</i>", styles["Normal"]))
 
         if not story:
             story.append(Paragraph("Empty Presentation", styles["Normal"]))
@@ -685,8 +745,17 @@ class OfficeEngine(BaseEngine):
         for idx, slide in enumerate(prs.slides):
             lines = [f"--- Slide {idx + 1} ---"]
             for shape in slide.shapes:
-                if shape.has_text_frame:
-                    lines.append(shape.text_frame.text.strip())
+                if getattr(shape, "has_text_frame", False):
+                    txt = shape.text_frame.text.strip()
+                    if txt:
+                        lines.append(txt)
+                if getattr(shape, "has_table", False):
+                    for row in shape.table.rows:
+                        lines.append("\t".join(cell.text.strip() for cell in row.cells))
+            if getattr(slide, "has_notes_slide", False) and slide.notes_slide and slide.notes_slide.notes_text_frame:
+                notes_txt = slide.notes_slide.notes_text_frame.text.strip()
+                if notes_txt:
+                    lines.append(f"[Speaker Notes] {notes_txt}")
             slides_text.append("\n".join(lines))
         target_file.write_text("\n\n".join(slides_text) or " ", encoding="utf-8")
         return target_file

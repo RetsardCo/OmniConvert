@@ -141,6 +141,25 @@ class PDFEngine(BaseEngine):
 
             return target_file
 
+        # PDF Page Split / Extract Pages to PDF
+        elif op == "pdf.extract_pages" or target_format == "pdf":
+            target_file = workspace_dir / f"{source.stem}.pdf"
+            start_page = max(1, int(settings.get("start_page", 1) or 1))
+            end_page_raw = int(settings.get("end_page", 0) or 0)
+            end_page = total_pages if end_page_raw <= 0 else min(total_pages, end_page_raw)
+            if start_page > end_page:
+                raise ValueError(f"Invalid page range: start_page ({start_page}) > end_page ({end_page}).")
+
+            writer = pypdf.PdfWriter()
+            for idx in range(start_page - 1, end_page):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("Cancelled during PDF page extraction.")
+                writer.add_page(reader.pages[idx])
+            with open(target_file, "wb") as f:
+                writer.write(f)
+            writer.close()
+            return target_file
+
         raise NotImplementedError(f"Unsupported PDF operation: {op}")
 
     def _pdf_to_docx(
@@ -168,6 +187,10 @@ class PDFEngine(BaseEngine):
         # Validate PDF is readable and non-empty first
         try:
             reader = pypdf.PdfReader(str(source))
+            if reader.is_encrypted:
+                password = settings.get("password", "")
+                if reader.decrypt(password) == 0:
+                    raise ValueError("PDF is password-protected and could not be decrypted.")
             if len(reader.pages) == 0:
                 raise ValueError("PDF document contains 0 pages.")
         except Exception as e:

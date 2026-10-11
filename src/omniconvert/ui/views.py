@@ -64,22 +64,6 @@ class HistoryView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-                color: #e3e5e8;
-                gridline-color: #2d3036;
-            }
-            QHeaderView::section {
-                background-color: #22252a;
-                color: #9ba1a6;
-                padding: 6px;
-                border: 1px solid #2d3036;
-                font-weight: bold;
-            }
-        """)
         layout.addWidget(self.table)
 
         self.refresh()
@@ -155,15 +139,6 @@ class FormatExplorerView(QWidget):
         filter_row = QHBoxLayout()
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("🔍 Search by extension (e.g. pdf, docx, mp3, flac, png, 7z) or operation...")
-        self.search_edit.setStyleSheet("""
-            QLineEdit {
-                background-color: #1a1b1f;
-                border: 1px solid #3c424f;
-                border-radius: 6px;
-                padding: 6px 10px;
-                color: #f0f2f5;
-            }
-        """)
         self.search_edit.textChanged.connect(self._populate_table)
 
         self.category_combo = QComboBox()
@@ -186,22 +161,6 @@ class FormatExplorerView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-                color: #e3e5e8;
-                gridline-color: #2d3036;
-            }
-            QHeaderView::section {
-                background-color: #22252a;
-                color: #9ba1a6;
-                padding: 6px;
-                border: 1px solid #2d3036;
-                font-weight: bold;
-            }
-        """)
         layout.addWidget(self.table)
 
         self._populate_table()
@@ -270,16 +229,23 @@ class SettingsView(QWidget):
         card = QFrame()
         card.setObjectName("card")
         form = QFormLayout(card)
-        form.setSpacing(10)
+        form.setSpacing(8)
 
-        # Theme
+        # Theme & Log Level
         theme_row = QHBoxLayout()
         self.toggle_theme_btn = QPushButton("Toggle Dark / Light Theme")
         if self.on_theme_toggle:
             self.toggle_theme_btn.clicked.connect(self.on_theme_toggle)
         theme_row.addWidget(self.toggle_theme_btn)
+        theme_row.addSpacing(20)
+        theme_row.addWidget(QLabel("Log Level:"))
+        self.log_level_combo = QComboBox()
+        self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])
+        self.log_level_combo.setCurrentText(self.settings.log_level)
+        self.log_level_combo.currentTextChanged.connect(self._save_preferences)
+        theme_row.addWidget(self.log_level_combo)
         theme_row.addStretch()
-        form.addRow("Interface Theme:", theme_row)
+        form.addRow("Appearance & Logging:", theme_row)
 
         # Default Output Folder
         out_row = QHBoxLayout()
@@ -292,19 +258,40 @@ class SettingsView(QWidget):
         out_row.addWidget(browse_btn)
         form.addRow("Default Output Folder:", out_row)
 
-        # Collision policy
+        # Temporary Scratch Folder
+        temp_row = QHBoxLayout()
+        self.temp_dir_edit = QLineEdit(self.settings.temp_dir)
+        self.temp_dir_edit.setPlaceholderText("Default: %LOCALAPPDATA%\\OmniConvert\\Temp")
+        self.temp_dir_edit.textChanged.connect(self._save_preferences)
+        temp_browse_btn = QPushButton("Browse...")
+        temp_browse_btn.clicked.connect(self._browse_temp_dir)
+        temp_row.addWidget(self.temp_dir_edit, stretch=1)
+        temp_row.addWidget(temp_browse_btn)
+        form.addRow("Temp Scratch Folder:", temp_row)
+
+        # Collision policy, Concurrency & Archive Bomb Limit
+        exec_row = QHBoxLayout()
         self.collision_combo = QComboBox()
         self.collision_combo.addItems(["rename", "overwrite", "ask"])
         self.collision_combo.setCurrentText(self.settings.collision_policy)
         self.collision_combo.currentTextChanged.connect(self._save_preferences)
-        form.addRow("Filename Collision Policy:", self.collision_combo)
-
-        # Max Concurrent Jobs
+        exec_row.addWidget(self.collision_combo)
+        exec_row.addSpacing(16)
+        exec_row.addWidget(QLabel("Max Concurrent Jobs:"))
         self.concurrent_spin = QSpinBox()
         self.concurrent_spin.setRange(1, 8)
         self.concurrent_spin.setValue(self.settings.max_concurrent_jobs)
         self.concurrent_spin.valueChanged.connect(self._save_preferences)
-        form.addRow("Max Concurrent Jobs:", self.concurrent_spin)
+        exec_row.addWidget(self.concurrent_spin)
+        exec_row.addSpacing(16)
+        exec_row.addWidget(QLabel("Max Archive Extraction (MB):"))
+        self.archive_limit_spin = QSpinBox()
+        self.archive_limit_spin.setRange(10, 10240)
+        self.archive_limit_spin.setValue(self.settings.max_archive_mb)
+        self.archive_limit_spin.valueChanged.connect(self._save_preferences)
+        exec_row.addWidget(self.archive_limit_spin)
+        exec_row.addStretch()
+        form.addRow("Collision & Safety Limits:", exec_row)
 
         # History settings
         hist_row = QHBoxLayout()
@@ -329,21 +316,12 @@ class SettingsView(QWidget):
         dep_card.setObjectName("card")
         dep_layout = QVBoxLayout(dep_card)
         dep_title = QLabel("Local Engine & Dependency Status Report")
-        dep_title.setStyleSheet("font-weight: bold; font-size: 14px; background: transparent;")
+        dep_title.setStyleSheet("font-weight: bold; font-size: 14px;")
         dep_layout.addWidget(dep_title)
 
         self.dep_report_text = QTextEdit()
         self.dep_report_text.setReadOnly(True)
-        self.dep_report_text.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-                color: #cfd5dc;
-                font-family: 'Consolas', monospace;
-                font-size: 12px;
-            }
-        """)
+        self.dep_report_text.setStyleSheet("font-family: 'Consolas', monospace; font-size: 12px;")
         dep_layout.addWidget(self.dep_report_text)
         layout.addWidget(dep_card)
 
@@ -354,10 +332,18 @@ class SettingsView(QWidget):
         if folder:
             self.out_dir_edit.setText(folder)
 
+    def _browse_temp_dir(self):
+        folder = QFileDialog.getExistingDirectory(self, "Choose Temporary Scratch Folder")
+        if folder:
+            self.temp_dir_edit.setText(folder)
+
     def _save_preferences(self):
         self.settings.default_output_dir = self.out_dir_edit.text().strip()
+        self.settings.temp_dir = self.temp_dir_edit.text().strip()
         self.settings.collision_policy = self.collision_combo.currentText()  # type: ignore
         self.settings.max_concurrent_jobs = self.concurrent_spin.value()
+        self.settings.max_archive_mb = self.archive_limit_spin.value()
+        self.settings.log_level = self.log_level_combo.currentText()  # type: ignore
         self.settings.save_history = self.save_history_chk.isChecked()
         self.settings.history_limit = self.history_limit_spin.value()
         self.settings.save()

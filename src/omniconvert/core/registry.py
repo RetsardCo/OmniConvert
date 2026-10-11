@@ -238,6 +238,20 @@ class CapabilityRegistry:
         ))
 
         self.register(Capability(
+            id="image.to_gif",
+            display_name="Convert to GIF (.gif)",
+            description="Convert static or vector image into GIF format.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "svg"],
+            output_category="image",
+            output_format="gif",
+            engine="pillow",
+            operation="convert_image",
+            lossy=True,
+            limitations=["GIF uses a 256-color palette per frame."]
+        ))
+
+        self.register(Capability(
             id="image.extract_frames",
             display_name="Extract GIF Frames to PNG Folder",
             description="Extract all animation frames from a GIF into lossless PNG images.",
@@ -253,6 +267,22 @@ class CapabilityRegistry:
         # =====================================================================
         # 2. Documents, PDF & Word (pypdf & libreoffice/office Engines)
         # =====================================================================
+        self.register(Capability(
+            id="pdf.extract_pages",
+            display_name="Split / Extract PDF Page Range (.pdf)",
+            description="Extract a specific page range from a PDF into a new PDF document.",
+            input_categories=["document"],
+            input_formats=["pdf"],
+            output_category="document",
+            output_format="pdf",
+            engine="pypdf",
+            operation="extract_pages",
+            lossy=False,
+            settings_schema={
+                "start_page": {"type": "int", "min": 1, "max": 9999, "default": 1, "label": "Start Page (1-based)"},
+                "end_page": {"type": "int", "min": 0, "max": 9999, "default": 0, "label": "End Page (0=Last Page)"}
+            }
+        ))
         self.register(Capability(
             id="pdf.to_docx",
             display_name="Convert PDF to Word (.docx)",
@@ -1006,12 +1036,20 @@ class CapabilityRegistry:
             lossy=False
         ))
 
+        packable_inputs = [
+            "pdf", "docx", "doc", "xlsx", "pptx", "odt", "rtf", "txt", "markdown", "md", "html",
+            "csv", "tsv", "json", "yaml", "yml", "xml",
+            "png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "gif", "ico", "svg",
+            "mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "aiff", "wma",
+            "mp4", "mkv", "avi", "mov", "webm", "wmv", "flv", "mpeg", "dir"
+        ]
+
         self.register(Capability(
             id="archive.to_zip",
             display_name="Package / Repack into ZIP Archive (.zip)",
             description="Compress file, folder, or repack existing archive into a validated ZIP archive.",
             input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
-            input_formats=["tar", "tgz", "gz", "7z", "pdf", "docx", "xlsx", "pptx", "txt", "csv", "json", "png", "jpeg", "dir"],
+            input_formats=["tar", "tgz", "gz", "7z"] + packable_inputs,
             output_category="archive",
             output_format="zip",
             engine="archive",
@@ -1026,13 +1064,42 @@ class CapabilityRegistry:
             id="archive.to_7z",
             display_name="Package / Repack into 7-Zip Archive (.7z)",
             description="Compress or repack into high-ratio 7z archive.",
-            input_categories=["archive", "document", "data", "text", "directory"],
-            input_formats=["zip", "tar", "tgz", "pdf", "docx", "xlsx", "txt", "csv", "json", "dir"],
+            input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
+            input_formats=["zip", "tar", "tgz", "gz"] + packable_inputs,
             output_category="archive",
             output_format="7z",
             engine="archive",
             operation="create_7z",
             lossy=False
+        ))
+
+        self.register(Capability(
+            id="archive.to_tar",
+            display_name="Package / Repack into TAR Archive (.tar)",
+            description="Package file, folder, or repack existing archive into a TAR archive.",
+            input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
+            input_formats=["zip", "tgz", "gz", "7z"] + packable_inputs,
+            output_category="archive",
+            output_format="tar",
+            engine="archive",
+            operation="create_tar",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="archive.to_gz",
+            display_name="Compress into GZip Stream (.gz)",
+            description="Compress single file into a GZip (.gz) archive.",
+            input_categories=["document", "image", "data", "text", "audio", "video"],
+            input_formats=[f for f in packable_inputs if f != "dir"],
+            output_category="archive",
+            output_format="gz",
+            engine="archive",
+            operation="create_gz",
+            lossy=False,
+            settings_schema={
+                "compresslevel": {"type": "int", "min": 1, "max": 9, "default": 6, "label": "Compression Level (1-9)"}
+            }
         ))
 
         self.register(Capability(

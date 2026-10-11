@@ -21,15 +21,6 @@ class JobCard(QFrame):
         self.on_cancel = on_cancel
         self.on_retry = on_retry
         self.setObjectName("card")
-        self.setStyleSheet("""
-            QFrame#card {
-                border: 1px solid #2d3036;
-                border-radius: 8px;
-                background-color: #22252a;
-                padding: 12px;
-                margin-bottom: 6px;
-            }
-        """)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(6)

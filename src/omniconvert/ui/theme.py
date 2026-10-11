@@ -15,6 +15,10 @@ QWidget {
     font-size: 13px;
 }
 
+QLabel {
+    background-color: transparent;
+}
+
 /* Sidebar navigation */
 #sidebar {
     background-color: #1f2125;
@@ -52,11 +56,60 @@ QStatusBar {
 }
 
 /* Content cards */
-.QFrame#card {
+QFrame#card {
     background-color: #22252a;
     border: 1px solid #2d3139;
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px;
+}
+
+/* Inputs, Combos, SpinBoxes, Lists, Tables, TextEdits */
+QLineEdit, QComboBox, QSpinBox {
+    background-color: #2b2f38;
+    color: #f0f2f5;
+    border: 1px solid #3c424f;
+    border-radius: 6px;
+    padding: 5px 10px;
+}
+
+QComboBox#qualityPresetCombo {
+    background-color: #1e293b;
+    border: 1px solid #3b82f6;
+    color: #f8fafc;
+    font-weight: 600;
+}
+
+QListWidget, QTableWidget, QTextEdit {
+    background-color: #1a1b1f;
+    color: #e3e5e8;
+    border: 1px solid #2d3036;
+    border-radius: 6px;
+    gridline-color: #2d3036;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+QListWidget::item:selected {
+    background-color: #0066cc;
+    color: #ffffff;
+}
+
+QHeaderView::section {
+    background-color: #22252a;
+    color: #9ba1a6;
+    padding: 6px;
+    border: 1px solid #2d3036;
+    font-weight: bold;
+}
+
+QScrollArea#settingsScroll, QWidget#settingsContainer {
+    background-color: #1a1b1f;
+    border: 1px solid #2d3036;
+    border-radius: 6px;
 }
 
 /* Buttons */
@@ -137,6 +190,11 @@ QWidget {
     font-size: 13px;
 }
 
+QLabel {
+    background-color: transparent;
+    color: #1f2328;
+}
+
 /* Sidebar navigation */
 #sidebar {
     background-color: #ffffff;
@@ -174,11 +232,60 @@ QStatusBar {
 }
 
 /* Content cards */
-.QFrame#card {
+QFrame#card {
     background-color: #ffffff;
     border: 1px solid #d0d7de;
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px;
+}
+
+/* Inputs, Combos, SpinBoxes, Lists, Tables, TextEdits */
+QLineEdit, QComboBox, QSpinBox {
+    background-color: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 5px 10px;
+}
+
+QComboBox#qualityPresetCombo {
+    background-color: #eff6ff;
+    border: 1px solid #2563eb;
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+QListWidget, QTableWidget, QTextEdit {
+    background-color: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    gridline-color: #e5e7eb;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+QListWidget::item:selected {
+    background-color: #0969da;
+    color: #ffffff;
+}
+
+QHeaderView::section {
+    background-color: #f3f4f6;
+    color: #374151;
+    padding: 6px;
+    border: 1px solid #d0d7de;
+    font-weight: bold;
+}
+
+QScrollArea#settingsScroll, QWidget#settingsContainer {
+    background-color: #f8fafc;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
 }
 
 /* Buttons */
@@ -245,6 +352,7 @@ QScrollBar::handle:vertical:hover {
     background: #aab2bd;
 }
 """
+
 
 def get_theme_stylesheet(theme: Literal["dark", "light"] = "dark") -> str:
     """Return CSS/QSS for the requested theme."""

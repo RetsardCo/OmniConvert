@@ -34,7 +34,7 @@ def validate_output(
         return False, f"Could not inspect output file size: {e}"
 
     # Format-specific validation
-    if fmt in ("png", "jpg", "jpeg", "webp", "bmp", "ico", "tiff", "tif"):
+    if fmt in ("png", "jpg", "jpeg", "webp", "bmp", "ico", "tiff", "tif", "gif"):
         try:
             from PIL import Image
             with Image.open(target_path) as img:
@@ -123,6 +123,14 @@ def validate_output(
                 sz.list()
         except Exception as e:
             return False, f"Generated 7Z archive is invalid: {e}"
+
+    elif fmt == "gz":
+        try:
+            import gzip
+            with gzip.open(target_path, "rb") as gz:
+                gz.read(64)
+        except Exception as e:
+            return False, f"Generated GZ archive is invalid: {e}"
 
     elif fmt in ("mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "aiff", "mp4", "mkv", "avi", "mov", "webm", "gif"):
         try:

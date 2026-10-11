@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._connect_job_events()
         self._check_system_dependencies()
+        self.home_view.refresh_recent(self.history_manager.load_records())
 
     @property
     def active_jobs_count(self) -> int:
@@ -67,6 +68,7 @@ class MainWindow(QMainWindow):
         self.settings = updated
         self.job_manager.thread_pool.setMaxThreadCount(updated.max_concurrent_jobs)
         self.history_manager.max_records = updated.history_limit
+        logging.getLogger().setLevel(getattr(logging, updated.log_level.upper(), logging.INFO))
         if updated.default_output_dir and not self.conversion_view.output_dir_edit.text().strip():
             self.conversion_view.output_dir_edit.setText(updated.default_output_dir)
 
@@ -94,11 +96,10 @@ class MainWindow(QMainWindow):
             icon_lbl = QLabel()
             pix = QPixmap(str(icon_png)).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             icon_lbl.setPixmap(pix)
-            icon_lbl.setStyleSheet("background: transparent;")
             brand_row.addWidget(icon_lbl)
 
         brand_label = QLabel("OmniConvert")
-        brand_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #3b82f6; background: transparent;")
+        brand_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #3b82f6;")
         brand_row.addWidget(brand_label)
         brand_row.addStretch()
         sidebar_layout.addLayout(brand_row)
@@ -133,7 +134,7 @@ class MainWindow(QMainWindow):
         # Engine quick status in sidebar footer
         self.engine_status_label = QLabel("Engines: Checking...")
         self.engine_status_label.setWordWrap(True)
-        self.engine_status_label.setStyleSheet("font-size: 11px; color: #8a8f98; padding: 4px; background: transparent;")
+        self.engine_status_label.setStyleSheet("font-size: 11px; color: #8a8f98; padding: 4px;")
         sidebar_layout.addWidget(self.engine_status_label)
 
         root_layout.addWidget(sidebar)
@@ -180,7 +181,9 @@ class MainWindow(QMainWindow):
         self.job_manager.signals.failed.connect(self._on_job_failed)
 
     def _on_nav_clicked(self, page_id: int):
-        if page_id == 3:
+        if page_id == 0:
+            self.home_view.refresh_recent(self.history_manager.load_records())
+        elif page_id == 3:
             self.history_view.refresh()
         self.stack.setCurrentIndex(page_id)
 
@@ -188,23 +191,56 @@ class MainWindow(QMainWindow):
         self.conversion_view.add_files(files)
         self.nav_btns["Conversion"].setChecked(True)
         self.stack.setCurrentIndex(1)
-        self.status_bar.showMessage(f"Loaded {len(files)} file(s) into workspace", 5000)
+        self.status_bar.showMessage(f"Loaded {len(files)} item(s) into workspace", 5000)
+
+    def _resolve_collision_policy_for_job(self, src_path: Path, target_fmt: str, dest_dir: Path | None) -> str | None:
+        """If collision_policy is 'ask' and the target file exists, prompt user for Overwrite / Rename / Cancel."""
+        policy = self.settings.collision_policy
+        if policy != "ask":
+            return policy
+        out_folder = dest_dir if (dest_dir and dest_dir.is_dir()) else src_path.parent
+        fmt = target_fmt.lower().lstrip(".")
+        candidate = out_folder / f"{src_path.stem}_extracted" if fmt == "dir" else out_folder / f"{src_path.stem}.{fmt}"
+        if not candidate.exists():
+            return "rename"
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Output File Already Exists")
+        msg.setText(f"The output path already exists:\n{candidate}\n\nHow would you like to proceed?")
+        overwrite_btn = msg.addButton("Overwrite", QMessageBox.YesRole)
+        rename_btn = msg.addButton("Auto-Rename", QMessageBox.AcceptRole)
+        cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
+        msg.exec()
+
+        clicked = msg.clickedButton()
+        if clicked == cancel_btn:
+            return None
+        if clicked == overwrite_btn:
+            return "overwrite"
+        return "rename"
 
     def _on_job_requested(self, req: dict):
+        src_path = Path(req["source_path"])
+        target_fmt = req["target_format"]
         dest_dir = req.get("destination_path")
         if not dest_dir and self.settings.default_output_dir:
             dest_dir = Path(self.settings.default_output_dir)
 
+        effective_policy = self._resolve_collision_policy_for_job(src_path, target_fmt, dest_dir)
+        if effective_policy is None:
+            self.status_bar.showMessage("Conversion cancelled due to existing output file.", 4000)
+            return
+
         job = ConversionJob(
-            source_path=Path(req["source_path"]),
-            target_format=req["target_format"],
+            source_path=src_path,
+            target_format=target_fmt,
             operation_id=req["operation_id"],
             engine=req["engine"],
             settings=req.get("settings") or {},
             destination_path=dest_dir
         )
         self.queue_view.add_job_card(job)
-        self.job_manager.submit_job(job, collision_policy=self.settings.collision_policy)
+        self.job_manager.submit_job(job, collision_policy=effective_policy)
         # Switch to Queue View
         self.nav_btns["Queue"].setChecked(True)
         self.stack.setCurrentIndex(2)
@@ -216,6 +252,7 @@ class MainWindow(QMainWindow):
         if job and self.settings.save_history:
             self.history_manager.add_job(job)
             self.history_view.refresh()
+            self.home_view.refresh_recent(self.history_manager.load_records())
 
     def _on_job_failed(self, job_id: str, err):
         self.status_bar.showMessage(f"Job failed: {err.message}", 6000)
@@ -223,6 +260,7 @@ class MainWindow(QMainWindow):
         if job and self.settings.save_history:
             self.history_manager.add_job(job)
             self.history_view.refresh()
+            self.home_view.refresh_recent(self.history_manager.load_records())
 
     def _check_system_dependencies(self):
         has_ffmpeg = FFmpegDetector().detect().is_available

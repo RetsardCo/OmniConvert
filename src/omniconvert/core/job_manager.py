@@ -58,12 +58,18 @@ class JobExecutionRunnable(QRunnable):
     def cancel(self):
         self._is_cancelled = True
 
+    def _safe_emit(self, sig, *args):
+        try:
+            sig.emit(*args)
+        except RuntimeError:
+            pass
+
     def run(self):
         job_id = self.job.id
         self.job.started_at = datetime.datetime.now()
         self.job.state = JobState.RUNNING
-        self.signals.started.emit(job_id)
-        self.signals.state_changed.emit(job_id, JobState.RUNNING)
+        self._safe_emit(self.signals.started, job_id)
+        self._safe_emit(self.signals.state_changed, job_id, JobState.RUNNING)
 
         workspace = JobWorkspace(job_id)
         workspace_dir = workspace.create()
@@ -77,7 +83,7 @@ class JobExecutionRunnable(QRunnable):
             # 2. Execute conversion inside isolated workspace
             def on_progress(p: JobProgress):
                 self.job.progress = p
-                self.signals.progress.emit(job_id, p)
+                self._safe_emit(self.signals.progress, job_id, p)
 
             intermediate_file = self.engine.execute(
                 job=self.job,
@@ -92,8 +98,8 @@ class JobExecutionRunnable(QRunnable):
 
             # 3. Validation Phase
             self.job.state = JobState.VALIDATING
-            self.signals.state_changed.emit(job_id, JobState.VALIDATING)
-            self.signals.progress.emit(job_id, JobProgress(stage="Validating output", percentage=95.0))
+            self._safe_emit(self.signals.state_changed, job_id, JobState.VALIDATING)
+            self._safe_emit(self.signals.progress, job_id, JobProgress(stage="Validating output", percentage=95.0))
 
             valid, err_msg = validate_output(
                 target_path=intermediate_file,
@@ -142,8 +148,8 @@ class JobExecutionRunnable(QRunnable):
             self.job.destination_path = final_target
             self.job.finished_at = datetime.datetime.now()
             self.job.state = JobState.COMPLETED
-            self.signals.state_changed.emit(job_id, JobState.COMPLETED)
-            self.signals.completed.emit(job_id, str(final_target))
+            self._safe_emit(self.signals.state_changed, job_id, JobState.COMPLETED)
+            self._safe_emit(self.signals.completed, job_id, str(final_target))
 
         except InterruptedError:
             self._handle_cancelled()
@@ -158,8 +164,8 @@ class JobExecutionRunnable(QRunnable):
                 step=f"Step {we.step_index} ({we.capability_id})"
             )
             self.job.error = err
-            self.signals.state_changed.emit(job_id, JobState.FAILED)
-            self.signals.failed.emit(job_id, err)
+            self._safe_emit(self.signals.state_changed, job_id, JobState.FAILED)
+            self._safe_emit(self.signals.failed, job_id, err)
 
         except Exception as e:
             logger.error("Job %s execution failed: %s", job_id, e, exc_info=True)
@@ -167,8 +173,8 @@ class JobExecutionRunnable(QRunnable):
             self.job.finished_at = datetime.datetime.now()
             err = JobError(code="EXECUTION_ERROR", message=str(e))
             self.job.error = err
-            self.signals.state_changed.emit(job_id, JobState.FAILED)
-            self.signals.failed.emit(job_id, err)
+            self._safe_emit(self.signals.state_changed, job_id, JobState.FAILED)
+            self._safe_emit(self.signals.failed, job_id, err)
 
         finally:
             # 5. Always clean up temporary workspace
@@ -177,8 +183,11 @@ class JobExecutionRunnable(QRunnable):
     def _handle_cancelled(self):
         self.job.state = JobState.CANCELLED
         self.job.finished_at = datetime.datetime.now()
-        self.signals.state_changed.emit(self.job.id, JobState.CANCELLED)
-        self.signals.cancelled.emit(self.job.id)
+        self._safe_emit(self.signals.state_changed, self.job.id, JobState.CANCELLED)
+        self._safe_emit(self.signals.cancelled, self.job.id)
+
+
+_ACTIVE_THREAD_POOLS: list[QThreadPool] = []
 
 
 class JobManager(QObject):
@@ -189,6 +198,7 @@ class JobManager(QObject):
         self.signals = WorkerSignals()
         self.thread_pool = QThreadPool()
         self.thread_pool.setMaxThreadCount(max_concurrent)
+        _ACTIVE_THREAD_POOLS.append(self.thread_pool)
 
         self._jobs: Dict[str, ConversionJob] = {}
         self._runnables: Dict[str, JobExecutionRunnable] = {}

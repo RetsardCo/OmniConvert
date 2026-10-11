@@ -127,7 +127,7 @@ class OCREngine(BaseEngine):
             str(out_base),
             "-l", lang
         ]
-        res = self._runner.run(args, timeout=120.0)
+        res = self._runner.run(args, timeout=120.0, is_cancelled=is_cancelled)
         if res.cancelled or (is_cancelled and is_cancelled()):
             raise InterruptedError("OCR job cancelled.")
         if res.timed_out:

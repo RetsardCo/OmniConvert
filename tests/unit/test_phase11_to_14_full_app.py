@@ -311,6 +311,7 @@ def test_ui_workspace_quality_controls_and_views(tmp_path):
     # Verify Settings view dependency report is populated
     set_view = window.settings_view
     assert "100% Local Processing" in set_view.dep_report_text.toPlainText()
+    window.close()
 
 
 def test_packaging_and_dependency_scripts():
@@ -326,3 +327,196 @@ def test_packaging_and_dependency_scripts():
     cmd = build_package(dry_run=True)
     assert "--windowed" in cmd
     assert any("icon.ico" in c for c in cmd)
+
+
+def test_docx_interleaved_order_and_markdown_tables(tmp_path):
+    """Verify DOCX conversions preserve interleaved [Paragraph, Table, Paragraph] order and emit Markdown pipe tables."""
+    docx_src = tmp_path / "interleaved.docx"
+    doc = docx.Document()
+    doc.add_heading("Section Alpha", level=1)
+    doc.add_paragraph("Paragraph BEFORE table.")
+    tbl = doc.add_table(rows=2, cols=2)
+    tbl.cell(0, 0).text = "ColA"
+    tbl.cell(0, 1).text = "ColB"
+    tbl.cell(1, 0).text = "Val1"
+    tbl.cell(1, 1).text = "Val2"
+    doc.add_paragraph("Paragraph AFTER table.")
+    doc.save(str(docx_src))
+
+    eng = OfficeEngine()
+
+    # 1. DOCX -> MD
+    ws_md = tmp_path / "ws_md"
+    ws_md.mkdir()
+    md_file = eng.execute(
+        ConversionJob(source_path=docx_src, target_format="md", operation_id="office.docx_to_md", engine="libreoffice"),
+        ws_md
+    )
+    md_text = md_file.read_text(encoding="utf-8")
+    assert "| ColA | ColB |" in md_text
+    assert "| Val1 | Val2 |" in md_text
+    assert md_text.index("Paragraph BEFORE table.") < md_text.index("| ColA | ColB |") < md_text.index("Paragraph AFTER table.")
+
+    # 2. DOCX -> TXT
+    ws_txt = tmp_path / "ws_txt"
+    ws_txt.mkdir()
+    txt_file = eng.execute(
+        ConversionJob(source_path=docx_src, target_format="txt", operation_id="office.to_txt", engine="libreoffice"),
+        ws_txt
+    )
+    txt_content = txt_file.read_text(encoding="utf-8")
+    assert txt_content.index("Paragraph BEFORE table.") < txt_content.index("ColA\tColB") < txt_content.index("Paragraph AFTER table.")
+
+    # 3. DOCX -> HTML
+    ws_html = tmp_path / "ws_html"
+    ws_html.mkdir()
+    html_file = eng.execute(
+        ConversionJob(source_path=docx_src, target_format="html", operation_id="office.docx_to_html", engine="libreoffice"),
+        ws_html
+    )
+    html_content = html_file.read_text(encoding="utf-8")
+    assert html_content.index("Paragraph BEFORE table.") < html_content.index("<table>") < html_content.index("Paragraph AFTER table.")
+
+
+def test_pptx_slide_tables_and_speaker_notes(tmp_path):
+    """Verify PPTX to TXT and PDF extracts slide tables and speaker notes."""
+    from pptx.util import Inches
+    pptx_src = tmp_path / "notes_and_table.pptx"
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    slide.shapes.title.text = "Architecture Slide"
+    table_shape = slide.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(4), Inches(1.5))
+    table_shape.table.cell(0, 0).text = "Module"
+    table_shape.table.cell(0, 1).text = "Owner"
+    table_shape.table.cell(1, 0).text = "Planner"
+    table_shape.table.cell(1, 1).text = "CoreTeam"
+    notes_slide = slide.notes_slide
+    notes_slide.notes_text_frame.text = "Remember to highlight offline security."
+    prs.save(str(pptx_src))
+
+    eng = OfficeEngine()
+    ws_txt = tmp_path / "ws_pptx_txt"
+    ws_txt.mkdir()
+    out_txt = eng.execute(
+        ConversionJob(source_path=pptx_src, target_format="txt", operation_id="office.to_txt", engine="libreoffice"),
+        ws_txt
+    )
+    txt = out_txt.read_text(encoding="utf-8")
+    assert "Planner\tCoreTeam" in txt
+    assert "Remember to highlight offline security." in txt
+
+    ws_pdf = tmp_path / "ws_pptx_pdf"
+    ws_pdf.mkdir()
+    out_pdf = eng.execute(
+        ConversionJob(source_path=pptx_src, target_format="pdf", operation_id="office.to_pdf", engine="libreoffice"),
+        ws_pdf
+    )
+    reader = pypdf.PdfReader(str(out_pdf))
+    pdf_txt = reader.pages[0].extract_text()
+    assert "Planner" in pdf_txt
+    assert "Remember to highlight offline security." in pdf_txt
+
+
+def test_audio_lossless_24bit_and_alac_presets(tmp_path):
+    """Verify lossless preset selects 24-bit PCM for WAV/AIFF and ALAC for M4A."""
+    ff = FFmpegEngine()
+    if not ff.is_available():
+        pytest.skip("FFmpeg not available")
+
+    from omniconvert.engines.speech_engine import TTSEngine
+    src_wav = tmp_path / "input.wav"
+    TTSEngine()._write_fallback_pcm_wav(src_wav, "Lossless audio preset check")
+
+    # 1. WAV with lossless preset -> pcm_s24le
+    ws_wav = tmp_path / "ws_wav24"
+    ws_wav.mkdir()
+    out_wav = ff.execute(
+        ConversionJob(source_path=src_wav, target_format="wav", operation_id="audio.to_wav", engine="ffmpeg", settings={"quality_preset": "lossless"}),
+        ws_wav
+    )
+    info_wav = ff.inspector.inspect(out_wav)
+    assert info_wav.audio_streams[0].codec_name == "pcm_s24le"
+
+    # 2. AIFF with lossless preset -> pcm_s24be
+    ws_aiff = tmp_path / "ws_aiff24"
+    ws_aiff.mkdir()
+    out_aiff = ff.execute(
+        ConversionJob(source_path=src_wav, target_format="aiff", operation_id="audio.to_aiff", engine="ffmpeg", settings={"quality_preset": "lossless"}),
+        ws_aiff
+    )
+    info_aiff = ff.inspector.inspect(out_aiff)
+    assert info_aiff.audio_streams[0].codec_name == "pcm_s24be"
+
+    # 3. M4A with lossless preset -> alac
+    ws_m4a = tmp_path / "ws_m4a_alac"
+    ws_m4a.mkdir()
+    out_m4a = ff.execute(
+        ConversionJob(source_path=src_wav, target_format="m4a", operation_id="audio.to_m4a", engine="ffmpeg", settings={"quality_preset": "lossless"}),
+        ws_m4a
+    )
+    info_m4a = ff.inspector.inspect(out_m4a)
+    assert info_m4a.audio_streams[0].codec_name == "alac"
+
+
+def test_safe_subprocess_immediate_cancellation():
+    """Verify SafeSubprocessRunner.run terminates running child process immediately when is_cancelled becomes True."""
+    import sys
+    import time
+    from omniconvert.core.safe_subprocess import SafeSubprocessRunner
+
+    runner = SafeSubprocessRunner()
+    start = time.monotonic()
+
+    # Cancel after 150ms while running a 10-second sleep
+    res = runner.run(
+        [sys.executable, "-c", "import time; time.sleep(10)"],
+        timeout=10.0,
+        is_cancelled=lambda: (time.monotonic() - start) >= 0.15
+    )
+    elapsed = time.monotonic() - start
+    assert res.cancelled is True
+    assert elapsed < 2.0
+
+
+def test_pdf_extract_pages_and_supported_formats_doc_parity(tmp_path):
+    """Verify pdf.extract_pages splits PDF page ranges and SUPPORTED_FORMATS.md matches CapabilityRegistry."""
+    import re
+    from omniconvert.core.registry import CapabilityRegistry
+
+    # 1. Create a 3-page PDF and extract pages 2..3
+    pdf_src = tmp_path / "three_pages.pdf"
+    writer = pypdf.PdfWriter()
+    for _ in range(3):
+        writer.add_blank_page(width=612, height=792)
+    with open(pdf_src, "wb") as f:
+        writer.write(f)
+    writer.close()
+
+    pdf_eng = PDFEngine()
+    ws_split = tmp_path / "ws_split"
+    ws_split.mkdir()
+    split_out = pdf_eng.execute(
+        ConversionJob(
+            source_path=pdf_src,
+            target_format="pdf",
+            operation_id="pdf.extract_pages",
+            engine="pypdf",
+            settings={"start_page": 2, "end_page": 3}
+        ),
+        ws_split
+    )
+    split_reader = pypdf.PdfReader(str(split_out))
+    assert len(split_reader.pages) == 2
+
+    # 2. Verify every operation ID in SUPPORTED_FORMATS.md exists in CapabilityRegistry
+    reg = CapabilityRegistry()
+    registered_ids = {c.id for c in reg.get_all(only_available=False)}
+    doc_text = (Path(__file__).resolve().parents[2] / "SUPPORTED_FORMATS.md").read_text(encoding="utf-8")
+    doc_op_ids = [
+        m for m in re.findall(r"`([a-z]+\.[a-z0-9_]+)`", doc_text)
+        if not m.endswith(".exe") and not m.endswith(".py")
+    ]
+    assert len(doc_op_ids) >= 35
+    for op_id in doc_op_ids:
+        assert op_id in registered_ids, f"Operation {op_id} in SUPPORTED_FORMATS.md is missing from CapabilityRegistry"
+

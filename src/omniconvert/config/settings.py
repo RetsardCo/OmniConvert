@@ -17,8 +17,12 @@ ThemeMode = Literal["dark", "light"]
 class AppSettings:
     theme: ThemeMode = "dark"
     default_output_dir: str = ""
+    temp_dir: str = ""
+    models_dir: str = ""
     collision_policy: CollisionPolicy = "rename"
     max_concurrent_jobs: int = 2
+    max_archive_mb: int = 2048
+    log_level: str = "INFO"
     save_history: bool = True
     history_limit: int = 200
 

@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 class JobWorkspace:
     """Manages an isolated temporary scratch folder for a single conversion job."""
 
-    def __init__(self, job_id: Optional[str] = None):
+    def __init__(self, job_id: Optional[str] = None, base_dir: Optional[Path] = None):
         self.job_id = job_id or str(uuid.uuid4())[:8]
-        self.root_dir = get_temp_dir() / f"job_{self.job_id}"
+        root_base = base_dir if base_dir else get_temp_dir()
+        self.root_dir = root_base / f"job_{self.job_id}"
         self._created = False
 
     def __enter__(self) -> "JobWorkspace":
@@ -32,8 +33,11 @@ class JobWorkspace:
 
     def get_path(self, filename: str) -> Path:
         """Return a path inside this workspace, ensuring it's confined to the workspace."""
-        target = (self.root_dir / filename).resolve()
-        if not str(target).startswith(str(self.root_dir.resolve())):
+        resolved_root = self.root_dir.resolve()
+        target = (resolved_root / filename).resolve()
+        try:
+            target.relative_to(resolved_root)
+        except ValueError:
             raise ValueError(f"Path traversal detected: {filename}")
         return target
 

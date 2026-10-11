@@ -69,8 +69,6 @@ def test_ui_responsive_during_simulated_task():
     result = []
     worker.finished.connect(lambda val: result.append(val))
     worker.finished.connect(thread.quit)
-    worker.finished.connect(worker.deleteLater)
-    thread.finished.connect(thread.deleteLater)
 
     thread.start()
     # Process events while thread runs to ensure UI event loop is non-blocking
@@ -80,7 +78,9 @@ def test_ui_responsive_during_simulated_task():
             break
         time.sleep(0.01)
 
+    thread.quit()
     thread.wait(2000)
+    app.processEvents()
     assert result == ["done"]
 
 def test_pyside_mainwindow_headless():

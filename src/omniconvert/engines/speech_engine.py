@@ -114,7 +114,7 @@ class TTSEngine(BaseEngine):
             "engine.save_to_file(text, wav_path)\n"
             "engine.runAndWait()\n"
         )
-        res = self._runner.run([sys.executable, "-c", script, str(text_scratch), str(target_wav), str(rate)], timeout=60.0)
+        res = self._runner.run([sys.executable, "-c", script, str(text_scratch), str(target_wav), str(rate)], timeout=60.0, is_cancelled=is_cancelled)
 
         if is_cancelled and is_cancelled():
             raise InterruptedError("TTS synthesis cancelled.")

@@ -13,7 +13,10 @@ from omniconvert.ui.main_window import MainWindow
 
 def run_app():
     """Run OmniConvert desktop application."""
-    setup_logging()
+    import logging
+    settings = AppSettings.load()
+    level_val = getattr(logging, str(settings.log_level).upper(), logging.INFO)
+    setup_logging(level=level_val)
 
     # Set Windows AppUserModelID so the Windows taskbar displays our custom application icon
     if os.name == "nt":
@@ -30,7 +33,6 @@ def run_app():
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
-    settings = AppSettings.load()
     window = MainWindow(settings)
     window.show()
 

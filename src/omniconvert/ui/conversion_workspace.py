@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QListWidget, QListWidgetItem, QComboBox, QTextEdit, QFileDialog,
-    QSplitter, QMessageBox, QFormLayout, QSpinBox, QCheckBox, QLineEdit,
+    QSplitter, QFormLayout, QSpinBox, QCheckBox, QLineEdit,
     QScrollArea
 )
 
@@ -15,6 +15,8 @@ from omniconvert.core.registry import CapabilityRegistry
 from omniconvert.core.planner import WorkflowPlanner
 from omniconvert.models.capability import Capability
 from omniconvert.models.workflow import WorkflowPlan
+from omniconvert.engines.media_inspector import MediaInspector
+from omniconvert.engines.archive_engine import ArchiveEngine
 
 
 class ConversionWorkspaceView(QWidget):
@@ -31,6 +33,8 @@ class ConversionWorkspaceView(QWidget):
         self.available_workflows: list[WorkflowPlan] = []
         self._filtered_items: list[tuple[str, Any]] = []  # ("cap", Capability) or ("workflow", WorkflowPlan)
         self._setting_widgets: Dict[str, QWidget] = {}
+        self._media_inspector = MediaInspector()
+        self._archive_engine = ArchiveEngine()
 
         self._init_ui()
 
@@ -55,10 +59,15 @@ class ConversionWorkspaceView(QWidget):
         add_btn = QPushButton("+ Add Files")
         add_btn.setObjectName("primaryButton")
         add_btn.clicked.connect(self._browse_add_files)
+
+        add_folder_btn = QPushButton("+ Add Folder")
+        add_folder_btn.clicked.connect(self._browse_add_folder)
+
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_files)
 
         top_bar.addWidget(add_btn)
+        top_bar.addWidget(add_folder_btn)
         top_bar.addWidget(clear_btn)
         main_layout.addLayout(top_bar)
 
@@ -72,29 +81,11 @@ class ConversionWorkspaceView(QWidget):
         left_layout = QVBoxLayout(left_card)
         left_layout.setContentsMargins(12, 12, 12, 12)
 
-        left_title = QLabel("Input Files")
-        left_title.setStyleSheet("font-weight: bold; font-size: 14px; background: transparent;")
+        left_title = QLabel("Input Files & Folders")
+        left_title.setStyleSheet("font-weight: bold; font-size: 14px;")
         left_layout.addWidget(left_title)
 
         self.file_list = QListWidget()
-        self.file_list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-                color: #f0f2f5;
-                padding: 4px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-radius: 4px;
-                margin-bottom: 2px;
-            }
-            QListWidget::item:selected {
-                background-color: #0066cc;
-                color: #ffffff;
-            }
-        """)
         self.file_list.currentRowChanged.connect(self._on_file_selected)
         left_layout.addWidget(self.file_list)
         splitter.addWidget(left_card)
@@ -107,101 +98,57 @@ class ConversionWorkspaceView(QWidget):
         right_layout.setSpacing(10)
 
         self.details_label = QLabel("Select a file from the list to inspect details.")
-        self.details_label.setStyleSheet("font-size: 14px; font-weight: 600; background: transparent;")
+        self.details_label.setStyleSheet("font-size: 14px; font-weight: 600;")
         right_layout.addWidget(self.details_label)
 
         self.meta_text = QTextEdit()
         self.meta_text.setReadOnly(True)
-        self.meta_text.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-                color: #cfd5dc;
-                font-family: 'Consolas', monospace;
-                font-size: 12px;
-            }
-        """)
-        self.meta_text.setFixedHeight(88)
+        self.meta_text.setStyleSheet("font-family: 'Consolas', monospace; font-size: 12px;")
+        self.meta_text.setFixedHeight(96)
         right_layout.addWidget(self.meta_text)
 
         # Operation Search & Selector Row
         op_header_row = QHBoxLayout()
         op_lbl = QLabel("Choose Operation / Target Format:")
-        op_lbl.setStyleSheet("font-weight: 600; background: transparent;")
+        op_lbl.setStyleSheet("font-weight: 600;")
         op_header_row.addWidget(op_lbl)
         op_header_row.addStretch()
 
         self.op_filter_edit = QLineEdit()
         self.op_filter_edit.setPlaceholderText("🔍 Filter operations (e.g. docx, pdf, mp3, wav)...")
         self.op_filter_edit.setFixedWidth(250)
-        self.op_filter_edit.setStyleSheet("""
-            QLineEdit {
-                background-color: #1a1b1f;
-                border: 1px solid #3c424f;
-                border-radius: 5px;
-                padding: 4px 8px;
-                color: #f0f2f5;
-                font-size: 12px;
-            }
-        """)
         self.op_filter_edit.textChanged.connect(self._rebuild_operation_combo)
         op_header_row.addWidget(self.op_filter_edit)
         right_layout.addLayout(op_header_row)
 
         self.op_combo = QComboBox()
-        self.op_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2f38;
-                border: 1px solid #3c424f;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #f0f2f5;
-                font-weight: 500;
-            }
-        """)
         self.op_combo.currentIndexChanged.connect(self._on_operation_changed)
         right_layout.addWidget(self.op_combo)
 
         # Global Quality / Detail Level Selector
         quality_row = QHBoxLayout()
         q_lbl = QLabel("🎯 Conversion Quality & Detail Level:")
-        q_lbl.setStyleSheet("font-weight: 600; color: #60a5fa; background: transparent;")
+        q_lbl.setStyleSheet("font-weight: 600; color: #3b82f6;")
         quality_row.addWidget(q_lbl)
 
         self.quality_preset_combo = QComboBox()
+        self.quality_preset_combo.setObjectName("qualityPresetCombo")
         self.quality_preset_combo.addItem("💎 Lossless / Exact Quality (100% Detail & Fidelity)", "lossless")
         self.quality_preset_combo.addItem("✨ High Quality (Detailed - 95% / 256 kbps / 300 DPI)", "high")
         self.quality_preset_combo.addItem("⚖️ Balanced (Standard - 85% / 192 kbps / 150 DPI)", "balanced")
         self.quality_preset_combo.addItem("⚡ Compact / Fast (Compressed - 70% / 128 kbps / 96 DPI)", "compact")
         self.quality_preset_combo.addItem("🎛️ Custom (Adjust Fine-Grained Controls Below)", "custom")
-        self.quality_preset_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #1e293b;
-                border: 1px solid #3b82f6;
-                border-radius: 6px;
-                padding: 5px 10px;
-                color: #f8fafc;
-                font-weight: 600;
-            }
-        """)
         self.quality_preset_combo.currentIndexChanged.connect(self._on_quality_preset_changed)
         quality_row.addWidget(self.quality_preset_combo, stretch=1)
         right_layout.addLayout(quality_row)
 
         # Dynamic Context-Sensitive Settings Area
         self.settings_scroll = QScrollArea()
+        self.settings_scroll.setObjectName("settingsScroll")
         self.settings_scroll.setWidgetResizable(True)
         self.settings_scroll.setMaximumHeight(150)
-        self.settings_scroll.setStyleSheet("""
-            QScrollArea {
-                border: 1px solid #2d3036;
-                border-radius: 6px;
-                background-color: #1a1b1f;
-            }
-        """)
         self.settings_container = QWidget()
-        self.settings_container.setStyleSheet("background-color: #1a1b1f;")
+        self.settings_container.setObjectName("settingsContainer")
         self.settings_form = QFormLayout(self.settings_container)
         self.settings_form.setContentsMargins(12, 8, 12, 8)
         self.settings_form.setSpacing(6)
@@ -211,18 +158,9 @@ class ConversionWorkspaceView(QWidget):
         # Output Folder Selector
         out_row = QHBoxLayout()
         out_lbl = QLabel("Output Folder:")
-        out_lbl.setStyleSheet("font-weight: 500; background: transparent;")
+        out_lbl.setStyleSheet("font-weight: 500;")
         self.output_dir_edit = QLineEdit(self.default_output_dir)
         self.output_dir_edit.setPlaceholderText("Default: Same folder as source file")
-        self.output_dir_edit.setStyleSheet("""
-            QLineEdit {
-                background-color: #1a1b1f;
-                border: 1px solid #3c424f;
-                border-radius: 5px;
-                padding: 5px 8px;
-                color: #f0f2f5;
-            }
-        """)
         out_browse_btn = QPushButton("Browse...")
         out_browse_btn.clicked.connect(self._browse_output_dir)
         out_row.addWidget(out_lbl)
@@ -233,7 +171,7 @@ class ConversionWorkspaceView(QWidget):
         # Warning / Limitation / Workflow Step Notice
         self.notice_label = QLabel("")
         self.notice_label.setWordWrap(True)
-        self.notice_label.setStyleSheet("color: #eab308; font-size: 12px; background: transparent;")
+        self.notice_label.setStyleSheet("color: #d97706; font-size: 12px;")
         right_layout.addWidget(self.notice_label)
 
         right_layout.addStretch()
@@ -265,6 +203,11 @@ class ConversionWorkspaceView(QWidget):
         if paths:
             self.add_files(paths)
 
+    def _browse_add_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder to Package or Inspect")
+        if folder:
+            self.add_files([folder])
+
     def _browse_output_dir(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if folder:
@@ -277,7 +220,12 @@ class ConversionWorkspaceView(QWidget):
                 continue
             self.files_meta.append(meta)
 
-            status_icon = "⚠️" if meta.error or not meta.is_readable else "📄"
+            if meta.error or not meta.is_readable:
+                status_icon = "⚠️"
+            elif meta.category == "directory":
+                status_icon = "📁"
+            else:
+                status_icon = "📄"
             item = QListWidgetItem(f"{status_icon} {meta.filename} ({meta.formatted_size}) [{meta.detected_format.upper()}]")
             self.file_list.addItem(item)
 
@@ -299,6 +247,57 @@ class ConversionWorkspaceView(QWidget):
         self.convert_btn.setEnabled(False)
         self.batch_convert_btn.setEnabled(False)
 
+    def _inspect_extended_details(self, meta: FileMetadata) -> tuple[List[str], Dict[str, Any]]:
+        """Perform deep inspection (dimensions, pages, streams, archive entries) and return extra info lines + flags."""
+        extra_lines: List[str] = []
+        flags: Dict[str, Any] = {"has_audio": True, "has_subtitles": True}
+        if not meta.is_readable or meta.is_empty:
+            return extra_lines, flags
+
+        fmt = meta.detected_format.lower()
+        try:
+            if meta.category == "image" and fmt != "svg":
+                from PIL import Image
+                with Image.open(meta.path) as img:
+                    frames = getattr(img, "n_frames", 1)
+                    extra_lines.append(
+                        f"Image Details: {img.width}x{img.height} px | Mode: {img.mode} | Frames: {frames}"
+                    )
+            elif fmt == "pdf":
+                import pypdf
+                reader = pypdf.PdfReader(str(meta.path))
+                enc = "Yes (Password Required)" if reader.is_encrypted else "No"
+                pages = len(reader.pages) if not reader.is_encrypted else "?"
+                extra_lines.append(f"PDF Details: {pages} page(s) | Encrypted: {enc}")
+            elif meta.category in ("audio", "video"):
+                if self._media_inspector.ffprobe_path and self._media_inspector.ffprobe_path.exists():
+                    info = self._media_inspector.inspect(meta.path)
+                    if info.is_valid:
+                        flags["has_audio"] = info.has_audio
+                        flags["has_subtitles"] = info.has_subtitles
+                        parts = [f"Duration: {info.duration_seconds:.2f}s"]
+                        if info.video_streams:
+                            vs = info.video_streams[0]
+                            parts.append(f"Video: {vs.width}x{vs.height} ({vs.codec_name})")
+                        if info.audio_streams:
+                            aus = info.audio_streams[0]
+                            parts.append(f"Audio: {aus.sample_rate}Hz {aus.channels}ch ({aus.codec_name})")
+                        else:
+                            parts.append("Audio: None")
+                        if info.subtitle_streams:
+                            parts.append(f"Subtitles: {len(info.subtitle_streams)} track(s)")
+                        extra_lines.append("Media Streams: " + " | ".join(parts))
+            elif meta.category == "archive":
+                manifest = self._archive_engine.inspect_archive(meta.path)
+                safety = "Safe" if manifest.is_safe else f"Unsafe ({manifest.safety_error})"
+                extra_lines.append(
+                    f"Archive Manifest: {manifest.total_files} file(s) | "
+                    f"Uncompressed: {manifest.total_uncompressed_bytes:,} bytes | Status: {safety}"
+                )
+        except Exception:
+            pass
+        return extra_lines, flags
+
     def _on_file_selected(self, row: int):
         if row < 0 or row >= len(self.files_meta):
             return
@@ -311,11 +310,23 @@ class ConversionWorkspaceView(QWidget):
             f"Size: {meta.formatted_size} ({meta.size_bytes:,} bytes) | Detected: {meta.detected_format.upper()} ({meta.category.capitalize()})",
             f"MIME: {meta.detected_mime} | Readable: {'Yes' if meta.is_readable else 'No'}",
         ]
+        extra_lines, stream_flags = self._inspect_extended_details(meta)
+        info_lines.extend(extra_lines)
         if meta.error:
             info_lines.append(f"Error: {meta.error}")
         self.meta_text.setText("\n".join(info_lines))
 
-        self.available_ops = self.registry.find_operations_for_file(meta, only_available=True)
+        ops = self.registry.find_operations_for_file(meta, only_available=True)
+        # Filter out stream-dependent operations when the media file lacks those streams
+        filtered_ops: List[Capability] = []
+        for op in ops:
+            if op.id == "video.extract_subtitles" and not stream_flags.get("has_subtitles", True):
+                continue
+            if op.id.startswith("video.extract_") and op.id != "video.extract_subtitles" and not stream_flags.get("has_audio", True):
+                continue
+            filtered_ops.append(op)
+
+        self.available_ops = filtered_ops
         self.available_workflows = (
             self.planner.find_multi_step_targets_for_format(meta.detected_format, only_available=True)
             if meta.is_readable and not meta.is_empty
@@ -396,7 +407,6 @@ class ConversionWorkspaceView(QWidget):
             notices.append(f"🔗 Multi-Step Workflow Plan: {wf.summary()}")
             if wf.is_lossy:
                 notices.append("⚠️ One or more steps in this workflow involve lossy encoding.")
-            # Use first step's schema if present
             if wf.steps:
                 first_cap = self.registry.get(wf.steps[0].capability_id)
                 if first_cap:
@@ -423,7 +433,6 @@ class ConversionWorkspaceView(QWidget):
                 spin = QSpinBox()
                 spin.setRange(int(spec.get("min", 0)), int(spec.get("max", 10000)))
                 spin.setValue(int(default_val if default_val is not None else 0))
-                spin.setStyleSheet("background-color: #2b2f38; color: #f0f2f5; padding: 3px; border: 1px solid #3c424f; border-radius: 4px;")
                 self._setting_widgets[key] = spin
                 self.settings_form.addRow(f"{label_txt}:", spin)
 
@@ -433,7 +442,6 @@ class ConversionWorkspaceView(QWidget):
                 combo.addItems(values)
                 if str(default_val) in values:
                     combo.setCurrentText(str(default_val))
-                combo.setStyleSheet("background-color: #2b2f38; color: #f0f2f5; padding: 3px; border: 1px solid #3c424f; border-radius: 4px;")
                 self._setting_widgets[key] = combo
                 self.settings_form.addRow(f"{label_txt}:", combo)
 
@@ -445,7 +453,6 @@ class ConversionWorkspaceView(QWidget):
 
             else:
                 edit = QLineEdit(str(default_val or ""))
-                edit.setStyleSheet("background-color: #2b2f38; color: #f0f2f5; padding: 3px; border: 1px solid #3c424f; border-radius: 4px;")
                 self._setting_widgets[key] = edit
                 self.settings_form.addRow(f"{label_txt}:", edit)
 
@@ -472,6 +479,9 @@ class ConversionWorkspaceView(QWidget):
 
         if "lossless" in self._setting_widgets and isinstance(self._setting_widgets["lossless"], QCheckBox):
             self._setting_widgets["lossless"].setChecked(preset == "lossless")
+
+        if "lossless_alac" in self._setting_widgets and isinstance(self._setting_widgets["lossless_alac"], QCheckBox):
+            self._setting_widgets["lossless_alac"].setChecked(preset == "lossless")
 
         # Audio bitrate & bit depth
         if "bitrate" in self._setting_widgets and isinstance(self._setting_widgets["bitrate"], QComboBox):

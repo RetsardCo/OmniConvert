@@ -1,8 +1,9 @@
 """Safe subprocess runner using argument arrays, timeouts, output capture, and process cancellation."""
 
 import subprocess
+import time
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -26,16 +27,20 @@ class SafeSubprocessRunner:
         self,
         args: List[str],
         timeout: Optional[float] = 300.0,
-        cwd: Optional[str] = None
+        cwd: Optional[str] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None
     ) -> SubprocessResult:
         """
         Execute command with argument array (never shell=True).
-        Supports cancellation and timeout.
+        Supports live cancellation via is_cancelled callback and timeout enforcement.
         """
         self._is_cancelled = False
         logger.info("Executing safe subprocess: %s", " ".join(args))
 
         try:
+            if is_cancelled and is_cancelled():
+                return SubprocessResult(returncode=-1, stdout="", stderr="", cancelled=True)
+
             # Creation flag to prevent popup console windows on Windows
             creationflags = 0
             try:
@@ -54,10 +59,43 @@ class SafeSubprocessRunner:
                 creationflags=creationflags
             )
 
-            stdout, stderr = self._current_process.communicate(timeout=timeout)
+            start_time = time.monotonic()
+            poll_interval = 0.05
+            stdout, stderr = "", ""
+
+            while True:
+                if self._is_cancelled or (is_cancelled and is_cancelled()):
+                    self._is_cancelled = True
+                    self._terminate_process()
+                    try:
+                        stdout, stderr = self._current_process.communicate(timeout=1.0)
+                    except Exception:
+                        pass
+                    return SubprocessResult(
+                        returncode=-1,
+                        stdout=stdout,
+                        stderr=stderr,
+                        cancelled=True
+                    )
+
+                if timeout is not None:
+                    elapsed = time.monotonic() - start_time
+                    remaining = timeout - elapsed
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(cmd=args, timeout=timeout)
+                    step = min(poll_interval, remaining)
+                else:
+                    step = poll_interval
+
+                try:
+                    stdout, stderr = self._current_process.communicate(timeout=step)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+
             returncode = self._current_process.returncode
 
-            if self._is_cancelled:
+            if self._is_cancelled or (is_cancelled and is_cancelled()):
                 return SubprocessResult(
                     returncode=-1,
                     stdout=stdout,

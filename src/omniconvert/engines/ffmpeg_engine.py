@@ -125,7 +125,8 @@ class FFmpegEngine(BaseEngine):
                 args.extend(["-q:a", "0"])
 
         elif op in ("video.extract_wav", "audio.to_wav") or target_format == "wav":
-            bit_depth = str(settings.get("bit_depth", "16"))
+            default_bd = "24" if preset_key in ("lossless", "exact", "high") else "16"
+            bit_depth = str(settings.get("bit_depth", default_bd))
             pcm_codec = "pcm_s24le" if bit_depth == "24" else "pcm_f32le" if bit_depth == "32" else "pcm_s16le"
             args.extend(["-vn", "-c:a", pcm_codec])
 
@@ -136,7 +137,8 @@ class FFmpegEngine(BaseEngine):
             args.extend(["-vn", "-c:a", "aac", "-b:a", bitrate])
 
         elif op in ("video.extract_m4a", "audio.to_m4a") or target_format == "m4a":
-            if settings.get("lossless_alac", False):
+            use_alac = settings.get("lossless_alac", preset_key in ("lossless", "exact"))
+            if use_alac:
                 args.extend(["-vn", "-c:a", "alac"])
             else:
                 args.extend(["-vn", "-c:a", "aac", "-b:a", bitrate])
@@ -160,7 +162,10 @@ class FFmpegEngine(BaseEngine):
                 args.extend(["-strict", "-2"])
 
         elif op == "audio.to_aiff" or target_format == "aiff":
-            args.extend(["-vn", "-c:a", "pcm_s16be"])
+            default_bd = "24" if preset_key in ("lossless", "exact", "high") else "16"
+            bit_depth = str(settings.get("bit_depth", default_bd))
+            aiff_codec = "pcm_s24be" if bit_depth == "24" else "pcm_s32be" if bit_depth == "32" else "pcm_s16be"
+            args.extend(["-vn", "-c:a", aiff_codec])
 
         # Video transcoding operations
         elif op in ("video.to_mp4", "video.to_mkv", "video.to_mov", "video.to_avi", "video.to_webm"):
@@ -222,8 +227,7 @@ class FFmpegEngine(BaseEngine):
             progress_callback(JobProgress(percentage=15.0, stage="Transcoding", detail=f"Encoding to .{target_format.upper()}"))
 
         # 3. Execute with SafeSubprocessRunner
-        runner = SafeSubprocessRunner()
-        res = runner.run(args, timeout=600.0)
+        res = self._runner.run(args, timeout=600.0, is_cancelled=is_cancelled)
 
         if res.cancelled or (is_cancelled and is_cancelled()):
             raise InterruptedError("Job cancelled by user.")

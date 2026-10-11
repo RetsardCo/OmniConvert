@@ -137,8 +137,8 @@ class ImageEngine(BaseEngine):
                 save_kwargs["subsampling"] = int(subsampling_setting)
 
         elif pillow_fmt == "WEBP":
-            default_lossless = preset_defaults.get("lossless", False)
-            default_q = preset_defaults.get("quality", 90)
+            default_lossless = preset_defaults.get("lossless", True)
+            default_q = preset_defaults.get("quality", 100 if default_lossless else 90)
             is_lossless = bool(settings.get("lossless", default_lossless))
             quality = max(1, min(100, int(settings.get("quality", 100 if is_lossless else default_q))))
             save_kwargs["lossless"] = is_lossless
