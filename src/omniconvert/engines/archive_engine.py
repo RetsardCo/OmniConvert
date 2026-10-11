@@ -189,6 +189,46 @@ class ArchiveEngine(BaseEngine):
                     is_dir=False,
                     is_symlink=False
                 ))
+            elif name_lower.endswith(".iso"):
+                fmt = "iso"
+                import pycdlib
+                iso = pycdlib.PyCdlib()
+                try:
+                    iso.open(str(path))
+                    use_joliet = iso.has_joliet()
+
+                    def scan_iso_dir(p_dir):
+                        nonlocal total_uncompressed
+                        children = iso.list_children(joliet_path=p_dir if use_joliet else None, iso_path=None if use_joliet else p_dir)
+                        for c in children:
+                            raw_id = c.file_identifier()
+                            if use_joliet:
+                                name = raw_id.decode("utf-16be", errors="ignore")
+                            else:
+                                name = raw_id.decode("ascii", errors="ignore").split(";")[0]
+                            if name in (".", ".."):
+                                continue
+                            if not is_safe_archive_member_path(name, dummy_root):
+                                suspicious.append(name)
+                            is_dir = c.is_dir()
+                            child_path = (p_dir + "/" + name).replace("//", "/")
+                            f_size = c.get_data_length() if not is_dir else 0
+                            total_uncompressed += f_size
+                            entries.append(ArchiveEntryInfo(
+                                name=child_path.lstrip("/"),
+                                uncompressed_size=f_size,
+                                compressed_size=f_size,
+                                is_dir=is_dir,
+                                is_symlink=False
+                            ))
+                            if is_dir:
+                                scan_iso_dir(child_path)
+
+                    scan_iso_dir("/")
+                    total_compressed = max(path.stat().st_size, 1)
+                finally:
+                    iso.close()
+
             else:
                 return ArchiveInspectionResult(error_message=f"Unsupported or unrecognized archive format: {path.name}")
 
@@ -333,6 +373,15 @@ class ArchiveEngine(BaseEngine):
                 return self.create_7z(temp_extract, out_7z, progress_callback, is_cancelled)
             return self.create_7z(source, out_7z, progress_callback, is_cancelled)
 
+        if op in ("archive.create_iso", "archive.to_iso") or target_format == "iso":
+            out_iso = workspace_dir / f"{source.stem}.iso"
+            if source.suffix.lower() in (".zip", ".tar", ".gz", ".tgz", ".7z") and source.is_file():
+                temp_extract = workspace_dir / "repack_extract"
+                temp_extract.mkdir(parents=True, exist_ok=True)
+                self.extract_safely(source, temp_extract, max_size, max_entries, max_ratio, progress_callback, is_cancelled)
+                return self.create_iso(temp_extract, out_iso, settings, progress_callback, is_cancelled)
+            return self.create_iso(source, out_iso, settings, progress_callback, is_cancelled)
+
         raise NotImplementedError(f"Unsupported archive operation: {op}")
 
     def extract_safely(
@@ -449,6 +498,47 @@ class ArchiveEngine(BaseEngine):
                         raise ValueError(f"Path traversal blocked in 7z archive: {item.filename}")
                 sz.extractall(path=dest_dir)
 
+        elif fmt == "iso":
+            import pycdlib
+            iso = pycdlib.PyCdlib()
+            try:
+                iso.open(str(archive_path))
+                use_joliet = iso.has_joliet()
+                bytes_written = 0
+
+                def extract_iso_dir(p_dir):
+                    nonlocal bytes_written
+                    children = iso.list_children(joliet_path=p_dir if use_joliet else None, iso_path=None if use_joliet else p_dir)
+                    for c in children:
+                        if is_cancelled and is_cancelled():
+                            raise InterruptedError("Archive extraction cancelled.")
+                        raw_id = c.file_identifier()
+                        name = raw_id.decode("utf-16be", errors="ignore") if use_joliet else raw_id.decode("ascii", errors="ignore").split(";")[0]
+                        if name in (".", ".."):
+                            continue
+                        if not is_safe_archive_member_path(name, dest_dir):
+                            raise ValueError(f"Path traversal blocked in ISO: {name}")
+                        child_path = (p_dir + "/" + name).replace("//", "/")
+                        rel_path = child_path.lstrip("/")
+                        target_local = dest_dir / rel_path
+                        if c.is_dir():
+                            target_local.mkdir(parents=True, exist_ok=True)
+                            extract_iso_dir(child_path)
+                        else:
+                            target_local.parent.mkdir(parents=True, exist_ok=True)
+                            if use_joliet:
+                                iso.get_file_from_iso(str(target_local), joliet_path=child_path)
+                            else:
+                                iso.get_file_from_iso(str(target_local), iso_path=child_path + ";1")
+                            bytes_written += target_local.stat().st_size
+                            if bytes_written > max_total_size:
+                                raise ValueError("Decompressed ISO data exceeded maximum size limit during extraction.")
+
+                extract_iso_dir("/")
+            finally:
+                iso.close()
+
+
         if progress_callback:
             progress_callback(JobProgress(percentage=100.0, stage="Complete", detail="Archive extracted safely"))
 
@@ -544,3 +634,75 @@ class ArchiveEngine(BaseEngine):
             else:
                 sz.write(source, arcname=source.name)
         return out_7z
+
+    def create_iso(
+        self,
+        source: Path,
+        out_iso: Path,
+        settings: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[JobProgress], None]] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None
+    ) -> Path:
+        """Create an ISO 9660 / Joliet optical disc image from a file or folder."""
+        import pycdlib
+        settings = settings or {}
+        out_iso.parent.mkdir(parents=True, exist_ok=True)
+
+        if progress_callback:
+            progress_callback(JobProgress(percentage=10.0, stage="Initializing ISO", detail=out_iso.name))
+
+        iso = pycdlib.PyCdlib()
+        iso.new(interchange_level=3, joliet=3)
+
+        d_cnt = 1
+        f_cnt = 1
+
+        def add_dir(local_dir: Path, iso_p: str = "/", jol_p: str = "/"):
+            nonlocal d_cnt, f_cnt
+            items = sorted(local_dir.iterdir())
+            total = max(len(items), 1)
+            for idx, p in enumerate(items):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("ISO creation cancelled.")
+                if p.is_dir():
+                    i_p = (iso_p + f"/D{d_cnt:04d}").replace("//", "/")
+                    j_p = (jol_p + "/" + p.name[:64]).replace("//", "/")
+                    d_cnt += 1
+                    iso.add_directory(i_p, joliet_path=j_p)
+                    add_dir(p, i_p, j_p)
+                elif p.is_file():
+                    ext = p.suffix.upper().lstrip(".")[:3] or "DAT"
+                    i_p = (iso_p + f"/F{f_cnt:05d}.{ext};1").replace("//", "/")
+                    j_p = (jol_p + "/" + p.name[:64]).replace("//", "/")
+                    f_cnt += 1
+                    iso.add_file(str(p), i_p, joliet_path=j_p)
+
+                if progress_callback:
+                    progress_callback(JobProgress(
+                        percentage=20.0 + (idx / total) * 60.0,
+                        stage="Adding to ISO",
+                        detail=p.name
+                    ))
+
+        try:
+            if source.is_dir():
+                add_dir(source)
+            else:
+                ext = source.suffix.upper().lstrip(".")[:3] or "DAT"
+                iso.add_file(str(source), f"/F00001.{ext};1", joliet_path=f"/{source.name[:64]}")
+
+            if is_cancelled and is_cancelled():
+                raise InterruptedError("ISO creation cancelled.")
+
+            if progress_callback:
+                progress_callback(JobProgress(percentage=85.0, stage="Writing ISO", detail=out_iso.name))
+
+            iso.write(str(out_iso))
+        finally:
+            iso.close()
+
+        if progress_callback:
+            progress_callback(JobProgress(percentage=100.0, stage="Complete", detail=f"Created {out_iso.name}"))
+
+        return out_iso
+

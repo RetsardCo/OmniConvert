@@ -24,6 +24,8 @@ dependencies = [
     "pytesseract>=0.3.10",
     "pyyaml>=6.0.0",
     "defusedxml>=0.7.0",
+    "pillow-heif>=1.0.0",
+    "pycdlib>=1.22.0",
 ]
 
 [project.optional-dependencies]

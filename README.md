@@ -95,7 +95,7 @@ All conversions run **100% locally on your machine**. Your sensitive files, docu
 | **Images** | `PNG`, `JPEG`, `WEBP`, `AVIF`, `BMP`, `TIFF`, `GIF`, `ICO`, `SVG` | Format conversion, Resize, Rotate, Windows Icon generation, Alpha flattening | `Pillow`, `pillow-avif-plugin`, `svglib`, `reportlab` |
 | **Audio** | `WAV`, `MP3`, `FLAC`, `AAC`, `M4A (AAC/ALAC)`, `OGG`, `Opus`, `AIFF` | Transcoding, Bit depth conversion (16/24-bit), Sample rate adjustment | `FFmpeg` 9+ |
 | **Video** | `MP4`, `MKV`, `WEBM`, `MOV`, `AVI` | Video transcoding, Audio extraction, Animated GIF extraction, Subtitle extraction | `FFmpeg` 9+ |
-| **Archives** | `ZIP`, `7Z`, `TAR`, `GZ` | Safe extraction, Compression, Multi-format packaging, Path traversal defense | Built-in `zipfile`, `tarfile`, `py7zr` |
+| **Archives & Disc Images** | `ZIP`, `7Z`, `TAR`, `GZ`, `ISO` | Safe extraction, Compression, Burn/Package to ISO, Disc burning, Path traversal defense | Built-in `zipfile`, `tarfile`, `py7zr`, `pycdlib` |
 | **Structured Data** | `JSON`, `CSV`, `YAML`, `XML` | Bidirectional conversions, Schema flattening, XXE-protected parsing | Python stdlib, `pyyaml`, `defusedxml` |
 | **Text & Code** | `TXT`, `MD`, `HTML`, `LOG`, Source files | CRLF $\leftrightarrow$ LF line ending conversion, UTF-8 / UTF-16 / ASCII encoding | Built-in Text Engine |
 | **Speech (TTS & ASR)** | `TXT`, `DOCX`, `PDF` $\rightarrow$ `WAV`; `Audio` $\rightarrow$ `TXT` | Local Text-to-Speech (offline Windows SAPI5) & Optional Speech Recognition | Windows SAPI5 / pyttsx3, `faster-whisper` |

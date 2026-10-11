@@ -142,6 +142,7 @@ EXTENSION_MAP = {
     "tgz": ("tar", "archive", "application/gzip"),
     "gz": ("gz", "archive", "application/gzip"),
     "7z": ("7z", "archive", "application/x-7z-compressed"),
+    "iso": ("iso", "archive", "application/x-iso9660-image"),
 
     # Binaries
     "exe": ("exe", "binary", "application/x-msdownload"),
@@ -280,6 +281,19 @@ def inspect_file(file_path: Path | str) -> FileMetadata:
     # 4. Handle .tar.gz / .tgz compound archive extension
     if not detected_format and header.startswith(b"\x1f\x8b\x08") and (filename.lower().endswith(".tar.gz") or ext == "tgz"):
         detected_format, detected_category, detected_mime = ("tar", "archive", "application/gzip")
+
+    # 4b. Handle ISO 9660 optical disc images (.iso)
+    if not detected_format and (ext == "iso" or size >= 32774):
+        try:
+            with open(path, "rb") as f:
+                f.seek(32769)
+                vol_id = f.read(5)
+                if vol_id == b"CD001" or ext == "iso":
+                    detected_format, detected_category, detected_mime = ("iso", "archive", "application/x-iso9660-image")
+        except Exception:
+            if ext == "iso":
+                detected_format, detected_category, detected_mime = ("iso", "archive", "application/x-iso9660-image")
+
 
     # 5. Match standard Magic Signatures
     if not detected_format:

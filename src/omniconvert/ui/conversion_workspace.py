@@ -224,6 +224,12 @@ class ConversionWorkspaceView(QWidget):
         self.batch_convert_btn.clicked.connect(self._start_batch_conversion)
         bottom_box.addWidget(self.batch_convert_btn)
 
+        self.burn_iso_btn = QPushButton("💿 Burn to Disc (Windows Disc Burner)")
+        self.burn_iso_btn.setStyleSheet("background-color: #854d0e; color: white;")
+        self.burn_iso_btn.hide()
+        self.burn_iso_btn.clicked.connect(self._launch_windows_iso_burner)
+        bottom_box.addWidget(self.burn_iso_btn)
+
         bottom_box.addStretch()
 
         self.convert_btn = QPushButton("Start Conversion")
@@ -287,6 +293,7 @@ class ConversionWorkspaceView(QWidget):
         self.notice_label.setText("")
         self.convert_btn.setEnabled(False)
         self.batch_convert_btn.setEnabled(False)
+        self.burn_iso_btn.hide()
 
     def remove_selected_files(self):
         """Remove currently selected items from the workspace."""
@@ -460,7 +467,22 @@ class ConversionWorkspaceView(QWidget):
             if meta.is_readable and not meta.is_empty
             else []
         )
+        if meta and meta.detected_format == "iso":
+            self.burn_iso_btn.show()
+        else:
+            self.burn_iso_btn.hide()
         self._rebuild_operation_combo()
+
+    def _launch_windows_iso_burner(self):
+        if not self.current_meta or not self.current_meta.path.exists():
+            return
+        import subprocess, shutil
+        iso_burn_exe = shutil.which("isoburn.exe") or "C:\\Windows\\System32\\isoburn.exe"
+        try:
+            subprocess.Popen([iso_burn_exe, str(self.current_meta.path)])
+            self.notice_label.setText(f"Launched Windows Disc Image Burner for {self.current_meta.filename}")
+        except Exception as e:
+            self.notice_label.setText(f"Could not launch Windows Disc Burner: {e}")
 
     def _rebuild_operation_combo(self):
         meta = self.current_meta

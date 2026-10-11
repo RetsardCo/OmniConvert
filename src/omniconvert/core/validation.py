@@ -132,6 +132,15 @@ def validate_output(
         except Exception as e:
             return False, f"Generated GZ archive is invalid: {e}"
 
+    elif fmt == "iso":
+        try:
+            import pycdlib
+            iso = pycdlib.PyCdlib()
+            iso.open(str(target_path))
+            iso.close()
+        except Exception as e:
+            return False, f"Generated ISO optical image is invalid: {e}"
+
     elif fmt in ("mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "aiff", "mp4", "mkv", "avi", "mov", "webm", "gif"):
         try:
             from omniconvert.engines.media_inspector import MediaInspector

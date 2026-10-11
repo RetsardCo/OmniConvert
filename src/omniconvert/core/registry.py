@@ -1060,11 +1060,24 @@ class CapabilityRegistry:
         ))
 
         self.register(Capability(
+            id="archive.extract_iso",
+            display_name="Extract ISO Disc Image (.iso)",
+            description="Safely extract all files and directory structure from an ISO 9660 / Joliet disc image.",
+            input_categories=["archive"],
+            input_formats=["iso"],
+            output_category="directory",
+            output_format="dir",
+            engine="archive",
+            operation="extract_archive",
+            lossy=False
+        ))
+
+        self.register(Capability(
             id="archive.list_to_json",
             display_name="Export Archive File Manifest to JSON",
             description="Inspect archive entries, sizes, and safety status without extracting files.",
             input_categories=["archive"],
-            input_formats=["zip", "tar", "tgz", "gz", "7z"],
+            input_formats=["zip", "tar", "tgz", "gz", "7z", "iso"],
             output_category="data",
             output_format="json",
             engine="archive",
@@ -1075,9 +1088,9 @@ class CapabilityRegistry:
         packable_inputs = [
             "pdf", "docx", "doc", "xlsx", "pptx", "odt", "rtf", "txt", "markdown", "md", "html",
             "csv", "tsv", "json", "yaml", "yml", "xml",
-            "png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "gif", "ico", "svg",
+            "png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "gif", "ico", "svg", "heic", "heif",
             "mp3", "wav", "flac", "aac", "m4a", "ogg", "opus", "aiff", "wma",
-            "mp4", "mkv", "avi", "mov", "webm", "wmv", "flv", "mpeg", "dir"
+            "mp4", "mkv", "avi", "mov", "webm", "wmv", "flv", "mpeg", "hevc", "h265", "dir"
         ]
 
         self.register(Capability(
@@ -1085,7 +1098,7 @@ class CapabilityRegistry:
             display_name="Package / Repack into ZIP Archive (.zip)",
             description="Compress file, folder, or repack existing archive into a validated ZIP archive.",
             input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
-            input_formats=["tar", "tgz", "gz", "7z"] + packable_inputs,
+            input_formats=["tar", "tgz", "gz", "7z", "iso"] + packable_inputs,
             output_category="archive",
             output_format="zip",
             engine="archive",
@@ -1101,7 +1114,7 @@ class CapabilityRegistry:
             display_name="Package / Repack into 7-Zip Archive (.7z)",
             description="Compress or repack into high-ratio 7z archive.",
             input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
-            input_formats=["zip", "tar", "tgz", "gz"] + packable_inputs,
+            input_formats=["zip", "tar", "tgz", "gz", "iso"] + packable_inputs,
             output_category="archive",
             output_format="7z",
             engine="archive",
@@ -1114,11 +1127,24 @@ class CapabilityRegistry:
             display_name="Package / Repack into TAR Archive (.tar)",
             description="Package file, folder, or repack existing archive into a TAR archive.",
             input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
-            input_formats=["zip", "tgz", "gz", "7z"] + packable_inputs,
+            input_formats=["zip", "tgz", "gz", "7z", "iso"] + packable_inputs,
             output_category="archive",
             output_format="tar",
             engine="archive",
             operation="create_tar",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="archive.to_iso",
+            display_name="Burn / Package to ISO Disc Image (.iso)",
+            description="Master and package files, folders, or existing archives into a mountable ISO 9660 / Joliet disc image.",
+            input_categories=["archive", "document", "image", "data", "text", "audio", "video", "directory"],
+            input_formats=["zip", "tar", "tgz", "gz", "7z"] + packable_inputs,
+            output_category="archive",
+            output_format="iso",
+            engine="archive",
+            operation="create_iso",
             lossy=False
         ))
 
