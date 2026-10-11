@@ -707,15 +707,28 @@ An operation is complete only when:
 
 ### 15.1 Packaging approach
 
-Use PyInstaller as the initial packaging approach, but verify all external dependencies separately.
+### 15.1 Multi-Tier Distribution Architecture (5 GitHub Release Targets)
 
-Potential distribution models:
+OmniConvert adopts a multi-tier distribution strategy using PyInstaller and Inno Setup, leveraging **GitHub Releases** for hosting free global CDN release assets:
 
-- **Installer:** installs the application and approved dependencies.
-- **Portable package:** keeps application files and supported bundled tools in a local directory.
-- **Core installer plus optional engines:** keeps the base installer smaller and lets users install additional capabilities.
-
-Choose the model after measuring package size, reviewing licenses, and testing on clean Windows systems.
+1. **`OmniConvert-Portable-Lite.zip` (~110 MB)**:
+   - Contains the core application and native offline engines (Pillow, PyMuPDF, ReportLab, python-docx, openpyxl, python-pptx, FFmpeg, pycdlib, py7zr).
+   - Zero external AI model weights. Instant download, completely portable with no installation required.
+2. **`OmniConvert-Portable-OCR.zip` (~145 MB)**:
+   - Core application bundled with a portable distribution of Tesseract OCR (`bin/tesseract/`) and English language data.
+   - Activates offline image-to-text OCR out of the box with zero setup.
+3. **`OmniConvert-Portable-Whisper.zip` (~185 MB)**:
+   - Core application bundled with `faster-whisper` and pre-downloaded quantized neural speech-to-text model weights (`resources/models/`).
+   - Enables offline speech transcription with zero runtime downloads.
+4. **`OmniConvert-Portable-Full.zip` (~240 MB)**:
+   - The complete all-in-one offline power-suite with both Tesseract OCR and Whisper ASR models pre-packaged.
+   - 100% offline functionality across all 70+ supported formats and AI features.
+5. **`OmniConvert-Setup.exe` (~110 MB Smart Windows Installer)**:
+   - Built using **Inno Setup** with custom component checkboxes:
+     - `[x] OmniConvert Core Engine (Required)`
+     - `[ ] Offline Tesseract OCR (+35 MB) [Downloads bundle from GitHub Releases during setup]`
+     - `[ ] Offline Whisper Speech-to-Text (+75 MB) [Downloads bundle from GitHub Releases during setup]`
+   - Employs the Inno Download Plugin (`idp`) to fetch selected optional bundles directly from GitHub Releases during installation and unpacks them cleanly into `Program Files\OmniConvert\`.
 
 ### 15.2 External dependency handling
 

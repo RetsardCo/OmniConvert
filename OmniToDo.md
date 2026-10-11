@@ -398,6 +398,91 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ---
 
+## Phase 15 — Batch Combination & Modern Media Formats
+
+- [x] Implement multi-image batch combination into single multi-page PDF (`image.batch_to_pdf`) with configurable DPI.
+- [x] Implement multi-image batch combination into animated GIF (`image.batch_to_gif`) with custom FPS and loop settings.
+- [x] Add selective workspace file removal:
+  - [x] Dedicated "Remove Selected" button next to file list.
+  - [x] <kbd>Delete</kbd> and <kbd>Backspace</kbd> keyboard shortcuts on `file_list`.
+  - [x] Seamless selection fallback when items are deleted.
+- [x] Add Job Queue management buttons:
+  - [x] "Clear Finished" button to remove completed, failed, and cancelled cards without interrupting active conversions.
+  - [x] "Clear All" button to cancel active conversions and empty the queue.
+- [x] Integrate Apple iOS photo formats (`.heic`, `.heif` via `pillow-heif`):
+  - [x] ISO-BMFF brand detection (`heic`, `heix`, `mif1`, `msf1`).
+  - [x] 100% lossless conversion to PNG, TIFF, and lossless WebP.
+  - [x] Exact 4:4:4 chroma subsampling at 100% quality JPEG encoding.
+- [x] Integrate Apple iOS video formats (`.hevc`, `h265`, `265`):
+  - [x] Video container detection and registry mapping.
+  - [x] Bit-for-bit lossless remuxing (`-c copy`) and lossless transcoding.
+- [x] Add unit tests in `tests/unit/test_phase15_batch_heic_hevc.py` (5 passing).
+
+---
+
+## Phase 16 — Optical Disc Image Engine (`.iso`) & Disc Burning
+
+- [x] Add ISO 9660 Volume Descriptor signature sniffing (`CD001` at offset 32769).
+- [x] Integrate pure-Python `pycdlib` for complete zero-dependency ISO manipulation.
+- [x] Implement ISO disc image creation (`archive.create_iso` / `archive.to_iso`):
+  - [x] Master any folder or file collection into an ISO 9660 Level 3 + Joliet disc image.
+  - [x] Full Unicode long filename support (up to 64 characters) across nested directories.
+- [x] Implement safe ISO disc extraction (`archive.extract_iso` / `archive.extract`):
+  - [x] Recursive extraction preserving directory structure.
+  - [x] Enforce Zip-Slip path traversal protection and decompression size limits.
+- [x] Implement ISO manifest inspection (`archive.list_to_json`):
+  - [x] Pre-scan disc contents, calculate uncompressed bytes, and verify member safety without extracting.
+- [x] Implement cross-archive repacking:
+  - [x] `ISO ⇄ ZIP`, `ISO ⇄ 7Z`, `ISO ⇄ TAR`.
+- [x] Add direct Windows Disc Image Burner integration:
+  - [x] Show "💿 Burn to Disc (Windows Disc Burner)" button when an `.iso` file is selected.
+  - [x] Launch native `isoburn.exe` with preloaded ISO path for physical disc writing.
+- [x] Add unit tests in `tests/unit/test_phase16_iso_disc.py` (2 passing; 77 tests total across project).
+
+---
+
+## Phase 17 — Application Polish & User Experience Refinement (Current Phase)
+
+- [ ] UI visual polish and layout consistency:
+  - [ ] Polish hover states, button borders, and typography contrast across dark and light themes.
+  - [ ] Add informative tooltips to advanced parameter controls (e.g. CRF, chroma subsampling, audio bit depth).
+  - [ ] Ensure smooth scrolling and clean spacing in settings form and queue list.
+- [ ] Workspace & queue interaction polish:
+  - [ ] Add drag-and-drop visual indicator highlighting drop zones when dragging files over the window.
+  - [ ] Add confirmation dialog when clearing workspace with unsaved or active items.
+  - [ ] Add double-click on history record to directly open output file or containing directory.
+- [ ] Format and presets fine-tuning:
+  - [ ] Verify that default output presets give optimal balance of speed, quality, and compression for every format.
+  - [ ] Handle edge cases in corrupt or partial media files with friendly error messaging.
+- [ ] In-App component downloader foundation:
+  - [ ] Design non-intrusive banner or settings section for checking local AI engine status (OCR / Whisper).
+  - [ ] Prepare background download worker with progress bar for optional bundles hosted on GitHub Releases.
+
+---
+
+## Phase 18 — Multi-Tier Distribution & GitHub Release Pipeline (Final Phase)
+
+- [ ] Automated PyInstaller packaging scripts for **5 distinct distribution flavors**:
+  - [ ] **1. `OmniConvert-Portable-Lite.zip`** (~110 MB):
+    - Core offline converter (Office, PDF, Images, Audio, Video, Archives, ISO).
+    - Zero external AI model weights.
+  - [ ] **2. `OmniConvert-Portable-OCR.zip`** (~145 MB):
+    - Core app + portable Tesseract OCR binary and English trained data bundled inside.
+  - [ ] **3. `OmniConvert-Portable-Whisper.zip`** (~185 MB):
+    - Core app + faster-whisper and quantized speech-to-text models bundled inside.
+  - [ ] **4. `OmniConvert-Portable-Full.zip`** (~240 MB):
+    - Complete all-in-one offline power-suite with both OCR and Whisper pre-bundled.
+  - [ ] **5. `OmniConvert-Setup.exe`** (~110 MB Smart Installer):
+    - Built using **Inno Setup** with custom component checkboxes:
+      - `[x] OmniConvert Core Engine (Required)`
+      - `[ ] Offline Tesseract OCR (+35 MB) [Downloads from GitHub Releases]`
+      - `[ ] Offline Whisper Speech-to-Text (+75 MB) [Downloads from GitHub Releases]`
+    - Uses Inno Download Plugin (`idp`) to fetch selected bundles from GitHub Releases during setup.
+- [ ] Create GitHub Release publishing checklist and release notes template.
+- [ ] Verify clean install, portable extraction, and execution on a fresh Windows 10/11 environment.
+
+---
+
 ## Antigravity Working Rules
 
 Use these instructions whenever continuing implementation:

@@ -127,6 +127,24 @@ OmniConvert uses **faster-whisper** for offline neural speech transcription.
 
 ---
 
+## 📦 Multi-Tier Distribution Roadmap (Phase 18)
+
+OmniConvert provides 5 official release editions on GitHub Releases to match every user's needs:
+
+1. **`OmniConvert-Setup.exe` (Smart Installer ~110 MB)**:
+   - Compact Inno Setup installer that includes the entire core engine.
+   - Checkbox options during setup (`[ ] Include OCR Engine`, `[ ] Include Whisper Engine`). If checked, the installer downloads the components directly from GitHub Releases and places them in `engines/` automatically.
+2. **`OmniConvert-Portable-Lite.zip` (~110 MB)**:
+   - 100% self-contained, no installation required. Standard 69+ offline operations.
+3. **`OmniConvert-Portable-OCR.zip` (~145 MB)**:
+   - Portable build pre-bundled with Tesseract OCR for out-of-the-box image text extraction.
+4. **`OmniConvert-Portable-Whisper.zip` (~185 MB)**:
+   - Portable build pre-bundled with faster-whisper neural model for offline audio transcription.
+5. **`OmniConvert-Portable-Full.zip` (~240 MB)**:
+   - Complete suite containing Core, Tesseract OCR, and Whisper neural transcription.
+
+---
+
 ## 🛠️ Building Standalone `.exe` for Windows
 
 OmniConvert includes a pre-configured PyInstaller build script with embedded assets, custom icon, and hidden imports:

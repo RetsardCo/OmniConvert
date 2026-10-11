@@ -33,10 +33,12 @@ OmniConvert is a **local-first Windows desktop application** built with Python 3
                                   v
 +-------------------------------------------------------------------+
 |                       Pluggable Engines                           |
-|   ImageEngine (Pillow + PyMuPDF) | PDFEngine (pypdf + pdf2docx)   |
+|   ImageEngine (Pillow + pillow-heif + PyMuPDF)                   |
+|   PDFEngine (pypdf + pdf2docx)                                    |
 |   OfficeEngine (docx/openpyxl/pptx/reportlab + LibreOffice)       |
-|   FFmpegEngine (ffmpeg/ffprobe)  | DataEngine (json/yaml/xml/csv) |
-|   ArchiveEngine (zip/tar/gz/7z)  | TTSEngine / OCREngine / Binary |
+|   FFmpegEngine (ffmpeg/ffprobe 9+)                                |
+|   ArchiveEngine (zip/tar/gz/7z + pycdlib ISO 9660/Joliet)         |
+|   DataEngine (json/yaml/xml/csv) | TTSEngine / OCREngine / Binary  |
 +-------------------------------------------------------------------+
 ```
 
@@ -46,6 +48,7 @@ OmniConvert is a **local-first Windows desktop application** built with Python 3
 
 ### 2.1 File Inspection (`src/omniconvert/core/file_detector.py`)
 - Inspects magic bytes (PNG, JPEG, GIF, WebP, BMP, TIFF, ICO, PDF, ZIP/DOCX/XLSX/PPTX, 7Z, GZ, TAR, MP3/ID3, WAV/RIFF, FLAC, OGG, MP4/ISO-BMFF, MKV/EBML, MZ/PE) before falling back to extension and MIME heuristics.
+- Differentiates ISO Base Media File Format brands (`heic`, `heix`, `mif1`, `hevc`, `mov`, `mp4`) and checks ISO 9660 Optical Volume Descriptors (`CD001` at sector 16 offset 32769).
 - Differentiates Office Open XML containers (`.docx`, `.xlsx`, `.pptx`) from generic `.zip` archives by inspecting internal zip entries (`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`).
 
 ### 2.2 Capability Registry (`src/omniconvert/core/registry.py`)
@@ -65,6 +68,28 @@ OmniConvert is a **local-first Windows desktop application** built with Python 3
 
 ### 2.5 Security Guardrails
 - **Subprocess Safety (`src/omniconvert/core/safe_subprocess.py`)**: Never invokes a shell (`shell=False`), passes argument lists directly, hides console windows on Windows (`CREATE_NO_WINDOW`), and polls `is_cancelled()` every 50 ms so user cancellation immediately kills child processes.
-- **Archive Hardening (`src/omniconvert/engines/archive_engine.py`)**: Pre-scans all archive manifests before extraction to block Zip-Slip (`../`, absolute paths, drive-letter escapes), reject symlinks/hardlinks, and enforce uncompressed size (`2 GB`) and compression ratio (`200:1`) limits.
+- **Archive Hardening (`src/omniconvert/engines/archive_engine.py`)**: Pre-scans all archive and ISO disc manifests before extraction to block Zip-Slip (`../`, absolute paths, drive-letter escapes), reject symlinks/hardlinks, and enforce uncompressed size (`2 GB`) and compression ratio (`200:1`) limits.
 - **XML Hardening (`src/omniconvert/engines/data_engine.py`)**: Uses `defusedxml` to block XXE and entity expansion attacks.
 - **Static Binary Inspection (`src/omniconvert/engines/binary_engine.py`)**: Computes cryptographic hashes, Shannon entropy, printable strings, and static PE header metadata without ever executing or emulating binary inputs.
+
+---
+
+## 3. Multi-Tier Distribution & Release Architecture
+
+To serve both lightweight portable use-cases and complete offline power-users without requiring dedicated hosting servers, OmniConvert leverages **GitHub Releases** for hosting assets across 5 distinct release targets:
+
+1. **`OmniConvert-Portable-Lite.zip` (~110 MB)**:
+   - Built via PyInstaller (`--onedir`).
+   - Includes full GUI, FFmpeg 9+, PDF/Office, Data, Image, Archive, and ISO engines.
+   - Zero AI model weights. Pure offline converter.
+2. **`OmniConvert-Portable-OCR.zip` (~145 MB)**:
+   - Core app + pre-bundled portable Tesseract OCR binary and English language data.
+3. **`OmniConvert-Portable-Whisper.zip` (~185 MB)**:
+   - Core app + pre-bundled `faster-whisper` runtime and quantized neural model weights.
+4. **`OmniConvert-Portable-Full.zip` (~240 MB)**:
+   - The ultimate offline suite bundling both OCR and Whisper models for 100% complete zero-download functionality.
+5. **`OmniConvert-Setup.exe` (~110 MB Smart Installer)**:
+   - Authored with **Inno Setup**.
+   - Displays selectable component checkboxes during setup for optional OCR and Whisper bundles.
+   - Uses Inno Download Plugin (`idp`) to fetch selected bundles directly from GitHub Releases during installation.
+

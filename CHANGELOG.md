@@ -2,6 +2,30 @@
 
 All notable changes to **OmniConvert** are documented in this file.
 
+## [Unreleased] - Phase 17 & Phase 18
+### Planned
+- **Phase 17 — Application Polish & UX Refinement**:
+  - Refined Qt styling, visual drag-and-drop hover feedback, and enhanced tooltips for quality presets (Lossless, High, Balanced, Compact).
+  - Double-click to open converted files in History.
+  - Confirmation dialogs for clearing active queues and workspace files.
+- **Phase 18 — Multi-Tier Distribution & Smart Installer**:
+  - Inno Setup installer (`OmniConvert-Setup.exe`) with on-demand component selection (OCR & Whisper).
+  - 4 portable editions hosted on GitHub Releases (`Lite`, `OCR`, `Whisper`, `Full`).
+
+## [1.1.0] - 2026-10-12
+### Added
+- **ISO 9660 & Joliet Optical Disc Engine (`pycdlib`)**:
+  - Full support for `.iso` image files: inspect volume descriptors, safely extract archive/disc contents, create ISO 9660 / Joliet filesystem images from directories, and cross-repack between `.iso` and `.zip`/`.7z`/`.tar`.
+  - Added native Windows optical disc burner launch integration (`isoburn.exe`).
+- **Apple iOS HEIC & HEVC Integration**:
+  - Added `.heic` / `.heif` high-efficiency image support with lossless conversion via `pillow-heif`.
+  - Added `.hevc` / H.265 video stream remuxing and transcoding via FFmpeg.
+- **Batch Image Tools & Extended Workspace Controls**:
+  - Added batch multi-image to single multi-page PDF (`image.batch_to_pdf`).
+  - Added batch multi-image to animated GIF (`image.batch_to_gif`).
+  - Added granular "Remove Selected" button and keyboard shortcuts (`Delete`, `Backspace`) in the Conversion Workspace.
+  - Added "Clear All" and "Clear Finished" queue actions in the Job Queue.
+
 ## [1.0.0] - 2026-10-11
 
 ### Added
