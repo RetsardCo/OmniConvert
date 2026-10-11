@@ -67,35 +67,35 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 ## Phase 2 — File Selection, Identification, and Registry
 
 ### File handling
-- [ ] Implement file browsing.
-- [ ] Implement drag-and-drop input.
-- [ ] Support adding multiple files.
-- [ ] Display filename, size, extension, and path.
-- [ ] Handle missing, unreadable, empty, and duplicate inputs.
-- [ ] Inspect file signatures where possible.
-- [ ] Distinguish detected file type from the extension.
-- [ ] Avoid loading large files entirely into memory just to identify them.
+- [x] Implement file browsing.
+- [x] Implement drag-and-drop input.
+- [x] Support adding multiple files.
+- [x] Display filename, size, extension, and path.
+- [x] Handle missing, unreadable, empty, and duplicate inputs.
+- [x] Inspect file signatures where possible.
+- [x] Distinguish detected file type from the extension.
+- [x] Avoid loading large files entirely into memory just to identify them.
 
 ### Capability registry
-- [ ] Define a typed capability model.
-- [ ] Define stable operation identifiers.
-- [ ] Record accepted inputs and outputs.
-- [ ] Record required engines and optional dependencies.
-- [ ] Record operation settings and defaults.
-- [ ] Record lossiness and known limitations.
-- [ ] Record validation requirements.
-- [ ] Implement registry filtering by input capabilities and installed dependencies.
-- [ ] Add unit tests for registry filtering and unsupported operations.
+- [x] Define a typed capability model.
+- [x] Define stable operation identifiers.
+- [x] Record accepted inputs and outputs.
+- [x] Record required engines and optional dependencies.
+- [x] Record operation settings and defaults.
+- [x] Record lossiness and known limitations.
+- [x] Record validation requirements.
+- [x] Implement registry filtering by input capabilities and installed dependencies.
+- [x] Add unit tests for registry filtering and unsupported operations.
 
 ### Job model
-- [ ] Define conversion job states.
-- [ ] Define structured errors and warnings.
-- [ ] Define progress reporting.
-- [ ] Define source and destination path handling.
-- [ ] Implement safe output filename collision handling.
+- [x] Define conversion job states.
+- [x] Define structured errors and warnings.
+- [x] Define progress reporting.
+- [x] Define source and destination path handling.
+- [x] Implement safe output filename collision handling.
 
 **Acceptance criteria**
-- [ ] The application detects sample files and shows only registered operations that are available for the selected inputs and installed engines.
+- [x] The application detects sample files and shows only registered operations that are available for the selected inputs and installed engines.
 
 ---
 

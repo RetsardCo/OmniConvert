@@ -103,4 +103,4 @@ def test_pyside_mainwindow_headless():
     test_files = ["C:\\dummy\\image.png", "C:\\dummy\\sample.pdf"]
     window._on_files_received(test_files)
     assert window.stack.currentIndex() == 1
-    assert "Loaded 2 file(s)" in window.conversion_view.file_label.text()
+    assert window.conversion_view.file_list.count() == 2

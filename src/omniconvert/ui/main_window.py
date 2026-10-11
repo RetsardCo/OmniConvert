@@ -9,10 +9,12 @@ from PySide6.QtWidgets import (
 )
 
 from omniconvert.config.settings import AppSettings
+from omniconvert.core.registry import CapabilityRegistry
 from omniconvert.ui.theme import get_theme_stylesheet
 from omniconvert.ui.home_view import HomeView
+from omniconvert.ui.conversion_workspace import ConversionWorkspaceView
 from omniconvert.ui.views import (
-    ConversionView, QueueView, HistoryView, FormatExplorerView, SettingsView
+    QueueView, HistoryView, FormatExplorerView, SettingsView
 )
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: AppSettings = None):
         super().__init__()
         self.settings = settings or AppSettings.load()
+        self.registry = CapabilityRegistry()
         self.active_jobs_count = 0
 
         self.setWindowTitle("OmniConvert — Universal File Workspace")
@@ -101,7 +104,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
 
         self.home_view = HomeView()
-        self.conversion_view = ConversionView()
+        self.conversion_view = ConversionWorkspaceView(registry=self.registry)
         self.queue_view = QueueView()
         self.history_view = HistoryView()
         self.explorer_view = FormatExplorerView()
@@ -128,7 +131,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(page_id)
 
     def _on_files_received(self, files: list):
-        self.conversion_view.set_files(files)
+        self.conversion_view.add_files(files)
         self.nav_btns["Conversion"].setChecked(True)
         self.stack.setCurrentIndex(1)
         self.status_bar.showMessage(f"Loaded {len(files)} file(s) into workspace", 5000)
