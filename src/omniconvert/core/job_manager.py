@@ -15,6 +15,8 @@ from omniconvert.engines.base import BaseEngine
 from omniconvert.engines.data_engine import DataEngine
 from omniconvert.engines.ffmpeg_engine import FFmpegEngine
 from omniconvert.engines.image_engine import ImageEngine
+from omniconvert.engines.pdf_engine import PDFEngine
+from omniconvert.engines.office_engine import OfficeEngine
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +160,12 @@ class JobManager(QObject):
         # Register default baseline engines
         self.register_engine(DataEngine())
         self.register_engine(ImageEngine())
+        self.register_engine(PDFEngine())
+
+        office_eng = OfficeEngine()
+        if office_eng.is_available():
+            self.register_engine(office_eng)
+
         ffmpeg_eng = FFmpegEngine()
         if ffmpeg_eng.is_available():
             self.register_engine(ffmpeg_eng)

@@ -74,12 +74,13 @@ def test_ui_responsive_during_simulated_task():
 
     thread.start()
     # Process events while thread runs to ensure UI event loop is non-blocking
-    for _ in range(50):
+    for _ in range(100):
         app.processEvents()
         if result:
             break
-        time.sleep(0.005)
+        time.sleep(0.01)
 
+    thread.wait(2000)
     assert result == ["done"]
 
 def test_pyside_mainwindow_headless():

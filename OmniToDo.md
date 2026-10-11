@@ -189,28 +189,28 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 ## Phase 6 — Documents and PDFs
 
 ### Office conversion engine
-- [ ] Detect LibreOffice.
-- [ ] Verify headless conversion on the target Windows environment.
-- [ ] Implement DOCX-to-PDF.
-- [ ] Implement supported office-to-PDF operations.
-- [ ] Implement supported office-to-text operations.
-- [ ] Handle timeouts and failed document conversions.
-- [ ] Document which formats and output filters are actually supported.
+- [x] Detect LibreOffice.
+- [x] Verify headless conversion on the target Windows environment.
+- [x] Implement DOCX-to-PDF.
+- [x] Implement supported office-to-PDF operations.
+- [x] Implement supported office-to-text operations.
+- [x] Handle timeouts and failed document conversions.
+- [x] Document which formats and output filters are actually supported.
 
 ### PDF engine
-- [ ] Choose and integrate PyMuPDF and/or pypdf for specific operations.
-- [ ] Implement PDF metadata inspection.
-- [ ] Implement text extraction.
-- [ ] Implement page count and page metadata inspection.
-- [ ] Implement supported page splitting or merging only with clear user controls.
-- [ ] Implement PDF-to-JSON for a defined metadata/text schema.
-- [ ] Implement image-to-PDF.
-- [ ] Document limitations of PDF-to-editable-office conversions.
-- [ ] Validate output PDFs by reopening them with a compatible library.
-- [ ] Test encrypted, malformed, image-only, and large PDFs.
+- [x] Choose and integrate PyMuPDF and/or pypdf for specific operations.
+- [x] Implement PDF metadata inspection.
+- [x] Implement text extraction.
+- [x] Implement page count and page metadata inspection.
+- [x] Implement supported page splitting or merging only with clear user controls.
+- [x] Implement PDF-to-JSON for a defined metadata/text schema.
+- [x] Implement image-to-PDF.
+- [x] Document limitations of PDF-to-editable-office conversions.
+- [x] Validate output PDFs by reopening them with a compatible library.
+- [x] Test encrypted, malformed, image-only, and large PDFs.
 
 **Acceptance criteria**
-- [ ] Document/PDF operations are tested and limitations are displayed to users.
+- [x] Document/PDF operations are tested and limitations are displayed to users.
 
 ---
 

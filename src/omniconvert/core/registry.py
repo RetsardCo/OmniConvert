@@ -170,7 +170,7 @@ class CapabilityRegistry:
             lossy=False
         ))
 
-        # 2. Documents & PDF (pypdf Engine)
+        # 2. Documents & PDF (pypdf & office Engines)
         self.register(Capability(
             id="pdf.extract_text",
             display_name="Extract Text to TXT",
@@ -183,6 +183,60 @@ class CapabilityRegistry:
             operation="pdf_to_text",
             lossy=False,
             limitations=["Cannot extract text from scanned images without OCR."]
+        ))
+
+        self.register(Capability(
+            id="pdf.to_json",
+            display_name="Extract Text & Metadata to JSON",
+            description="Extract page-by-page text and document metadata into structured JSON.",
+            input_categories=["document"],
+            input_formats=["pdf"],
+            output_category="data",
+            output_format="json",
+            engine="pypdf",
+            operation="pdf_to_json",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="image.to_pdf",
+            display_name="Wrap Image into PDF",
+            description="Convert and embed image into a PDF page.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff"],
+            output_category="document",
+            output_format="pdf",
+            engine="pypdf",
+            operation="image_to_pdf",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="office.to_pdf",
+            display_name="Convert Office Document to PDF",
+            description="Render office document (Word, PowerPoint, Excel) to PDF.",
+            input_categories=["document"],
+            input_formats=["docx", "doc", "pptx", "xlsx", "odt", "rtf"],
+            output_category="document",
+            output_format="pdf",
+            engine="libreoffice",
+            operation="office_to_pdf",
+            lossy=False,
+            limitations=["Requires local LibreOffice installation."]
+        ))
+
+        self.register(Capability(
+            id="office.to_txt",
+            display_name="Convert Office Document to Plain Text",
+            description="Extract raw text from office document.",
+            input_categories=["document"],
+            input_formats=["docx", "doc", "odt", "rtf"],
+            output_category="text",
+            output_format="txt",
+            engine="libreoffice",
+            operation="office_to_txt",
+            lossy=True,
+            limitations=["Formatting and embedded images are stripped."]
         ))
 
         # 3. Structured Data (Data Engine)
