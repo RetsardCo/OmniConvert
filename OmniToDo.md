@@ -101,23 +101,23 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ## Phase 3 — Job Manager and Safe Execution
 
-- [ ] Implement a background job queue.
-- [ ] Keep conversion work off the UI thread.
-- [ ] Add per-job progress and status updates.
-- [ ] Add a configurable limit for concurrent jobs.
-- [ ] Implement cancellation where supported by the underlying engine.
-- [ ] Ensure worker threads communicate with the UI safely.
-- [ ] Implement safe subprocess execution with argument arrays.
-- [ ] Capture engine output and errors.
-- [ ] Add timeouts where appropriate.
-- [ ] Create per-job temporary directories.
-- [ ] Implement cleanup on success, failure, and cancellation.
-- [ ] Prevent source-file overwrites by default.
-- [ ] Validate destination paths.
-- [ ] Add tests for cancellation, failure propagation, and output collisions.
+- [x] Implement a background job queue.
+- [x] Keep conversion work off the UI thread.
+- [x] Add per-job progress and status updates.
+- [x] Add a configurable limit for concurrent jobs.
+- [x] Implement cancellation where supported by the underlying engine.
+- [x] Ensure worker threads communicate with the UI safely.
+- [x] Implement safe subprocess execution with argument arrays.
+- [x] Capture engine output and errors.
+- [x] Add timeouts where appropriate.
+- [x] Create per-job temporary directories.
+- [x] Implement cleanup on success, failure, and cancellation.
+- [x] Prevent source-file overwrites by default.
+- [x] Validate destination paths.
+- [x] Add tests for cancellation, failure propagation, and output collisions.
 
 **Acceptance criteria**
-- [ ] Jobs execute in the background, failures are visible, and source files are not overwritten accidentally.
+- [x] Jobs execute in the background, failures are visible, and source files are not overwritten accidentally.
 
 ---
 

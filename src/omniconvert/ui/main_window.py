@@ -10,11 +10,14 @@ from PySide6.QtWidgets import (
 
 from omniconvert.config.settings import AppSettings
 from omniconvert.core.registry import CapabilityRegistry
+from omniconvert.core.job_manager import JobManager
+from omniconvert.models.conversion_job import ConversionJob
 from omniconvert.ui.theme import get_theme_stylesheet
 from omniconvert.ui.home_view import HomeView
 from omniconvert.ui.conversion_workspace import ConversionWorkspaceView
+from omniconvert.ui.queue_view import QueueManagerView
 from omniconvert.ui.views import (
-    QueueView, HistoryView, FormatExplorerView, SettingsView
+    HistoryView, FormatExplorerView, SettingsView
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +27,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = settings or AppSettings.load()
         self.registry = CapabilityRegistry()
-        self.active_jobs_count = 0
+        self.job_manager = JobManager(max_concurrent=self.settings.max_concurrent_jobs)
 
         self.setWindowTitle("OmniConvert — Universal File Workspace")
         self.resize(1024, 700)
@@ -32,7 +35,12 @@ class MainWindow(QMainWindow):
 
         self._apply_theme()
         self._init_ui()
+        self._connect_job_events()
         self._check_system_dependencies()
+
+    @property
+    def active_jobs_count(self) -> int:
+        return self.job_manager.active_jobs_count()
 
     def _apply_theme(self):
         qss = get_theme_stylesheet(self.settings.theme)
@@ -105,13 +113,15 @@ class MainWindow(QMainWindow):
 
         self.home_view = HomeView()
         self.conversion_view = ConversionWorkspaceView(registry=self.registry)
-        self.queue_view = QueueView()
+        self.queue_view = QueueManagerView(job_manager=self.job_manager)
         self.history_view = HistoryView()
         self.explorer_view = FormatExplorerView()
         self.settings_view = SettingsView(on_theme_toggle=self._toggle_theme)
 
         # Connect Home Drop signal to Conversion View
         self.home_view.open_conversion.connect(self._on_files_received)
+        # Connect Conversion View Start button to Job Manager
+        self.conversion_view.job_requested.connect(self._on_job_requested)
 
         self.stack.addWidget(self.home_view)        # 0
         self.stack.addWidget(self.conversion_view)  # 1
@@ -127,6 +137,10 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("OmniConvert Ready (Local processing only)")
 
+    def _connect_job_events(self):
+        self.job_manager.signals.completed.connect(self._on_job_completed)
+        self.job_manager.signals.failed.connect(lambda jid, err: self.status_bar.showMessage(f"Job failed: {err.message}", 6000))
+
     def _on_nav_clicked(self, page_id: int):
         self.stack.setCurrentIndex(page_id)
 
@@ -135,6 +149,23 @@ class MainWindow(QMainWindow):
         self.nav_btns["Conversion"].setChecked(True)
         self.stack.setCurrentIndex(1)
         self.status_bar.showMessage(f"Loaded {len(files)} file(s) into workspace", 5000)
+
+    def _on_job_requested(self, req: dict):
+        job = ConversionJob(
+            source_path=req["source_path"],
+            target_format=req["target_format"],
+            operation_id=req["operation_id"],
+            engine=req["engine"]
+        )
+        self.queue_view.add_job_card(job)
+        self.job_manager.submit_job(job, collision_policy=self.settings.collision_policy)
+        # Switch to Queue View
+        self.nav_btns["Queue"].setChecked(True)
+        self.stack.setCurrentIndex(2)
+        self.status_bar.showMessage(f"Job queued: {job.source_path.name} ➔ .{job.target_format}")
+
+    def _on_job_completed(self, job_id: str, dest_path: str):
+        self.status_bar.showMessage(f"Conversion completed: {dest_path}", 6000)
 
     def _check_system_dependencies(self):
         has_ffmpeg = shutil.which("ffmpeg") is not None
@@ -146,11 +177,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Ensure safe shutdown when background jobs might be active."""
-        if self.active_jobs_count > 0:
+        active = self.job_manager.active_jobs_count()
+        if active > 0:
             res = QMessageBox.question(
                 self,
                 "Confirm Exit",
-                f"There are {self.active_jobs_count} background conversion job(s) in progress.\nAre you sure you want to cancel and exit?",
+                f"There are {active} background conversion job(s) in progress.\nAre you sure you want to cancel and exit?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
