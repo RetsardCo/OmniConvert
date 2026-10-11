@@ -63,11 +63,15 @@ class ConversionWorkspaceView(QWidget):
         add_folder_btn = QPushButton("+ Add Folder")
         add_folder_btn.clicked.connect(self._browse_add_folder)
 
+        remove_btn = QPushButton("Remove Selected")
+        remove_btn.clicked.connect(self.remove_selected_files)
+
         clear_btn = QPushButton("Clear All")
         clear_btn.clicked.connect(self.clear_files)
 
         top_bar.addWidget(add_btn)
         top_bar.addWidget(add_folder_btn)
+        top_bar.addWidget(remove_btn)
         top_bar.addWidget(clear_btn)
         main_layout.addLayout(top_bar)
 
@@ -80,14 +84,51 @@ class ConversionWorkspaceView(QWidget):
         left_card.setObjectName("card")
         left_layout = QVBoxLayout(left_card)
         left_layout.setContentsMargins(12, 12, 12, 12)
+        left_layout.setSpacing(8)
 
         left_title = QLabel("Input Files & Folders")
         left_title.setStyleSheet("font-weight: bold; font-size: 14px;")
         left_layout.addWidget(left_title)
 
         self.file_list = QListWidget()
+        self.file_list.setSelectionMode(QListWidget.ExtendedSelection)
         self.file_list.currentRowChanged.connect(self._on_file_selected)
         left_layout.addWidget(self.file_list)
+
+        file_btns = QHBoxLayout()
+        self.remove_file_btn = QPushButton("Remove Selected")
+        self.remove_file_btn.clicked.connect(self.remove_selected_files)
+        self.clear_all_btn = QPushButton("Clear All")
+        self.clear_all_btn.clicked.connect(self.clear_files)
+        file_btns.addWidget(self.remove_file_btn)
+        file_btns.addWidget(self.clear_all_btn)
+        left_layout.addLayout(file_btns)
+
+        # Batch image tools box
+        batch_card = QFrame()
+        batch_card.setStyleSheet("background: #181d28; border: 1px solid #2b3548; border-radius: 6px;")
+        batch_vbox = QVBoxLayout(batch_card)
+        batch_vbox.setContentsMargins(10, 8, 10, 8)
+        batch_vbox.setSpacing(6)
+
+        batch_title = QLabel("📦 Batch Image Operations")
+        batch_title.setStyleSheet("font-weight: 600; font-size: 12px; color: #60a5fa;")
+        batch_vbox.addWidget(batch_title)
+
+        batch_row = QHBoxLayout()
+        self.combine_pdf_btn = QPushButton("📑 Merge to 1 PDF")
+        self.combine_pdf_btn.setToolTip("Combine loaded/selected images into 1 multi-page PDF document")
+        self.combine_pdf_btn.clicked.connect(self._combine_images_to_pdf)
+
+        self.combine_gif_btn = QPushButton("🎞️ Merge to 1 GIF")
+        self.combine_gif_btn.setToolTip("Combine loaded/selected images into 1 animated GIF")
+        self.combine_gif_btn.clicked.connect(self._combine_images_to_gif)
+
+        batch_row.addWidget(self.combine_pdf_btn)
+        batch_row.addWidget(self.combine_gif_btn)
+        batch_vbox.addLayout(batch_row)
+        left_layout.addWidget(batch_card)
+
         splitter.addWidget(left_card)
 
         # Right: Details, Operation, Quality Preset & Settings Card
@@ -246,6 +287,93 @@ class ConversionWorkspaceView(QWidget):
         self.notice_label.setText("")
         self.convert_btn.setEnabled(False)
         self.batch_convert_btn.setEnabled(False)
+
+    def remove_selected_files(self):
+        """Remove currently selected items from the workspace."""
+        selected_indexes = sorted(list(set(idx.row() for idx in self.file_list.selectedIndexes())), reverse=True)
+        if not selected_indexes:
+            current = self.file_list.currentRow()
+            if current >= 0:
+                selected_indexes = [current]
+
+        for row in selected_indexes:
+            if 0 <= row < len(self.files_meta):
+                del self.files_meta[row]
+                self.file_list.takeItem(row)
+
+        if self.files_meta:
+            new_row = min(selected_indexes[-1] if selected_indexes else 0, len(self.files_meta) - 1)
+            self.file_list.setCurrentRow(max(0, new_row))
+        else:
+            self.clear_files()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+            if self.file_list.hasFocus():
+                self.remove_selected_files()
+                return
+        super().keyPressEvent(event)
+
+    def _get_target_image_paths(self) -> List[Path]:
+        """Collect image files from user selection or all loaded files."""
+        selected_rows = sorted(list(set(idx.row() for idx in self.file_list.selectedIndexes())))
+        if len(selected_rows) > 1:
+            candidate_metas = [self.files_meta[i] for i in selected_rows if 0 <= i < len(self.files_meta)]
+        else:
+            candidate_metas = self.files_meta
+
+        image_paths = [
+            m.path for m in candidate_metas
+            if m.category == "image" or m.detected_format.lower() in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "heic", "heif", "gif")
+        ]
+        return image_paths
+
+    def _combine_images_to_pdf(self):
+        """Combine images into a single multi-page PDF."""
+        images = self._get_target_image_paths()
+        if len(images) < 2:
+            self.notice_label.setText("⚠️ Please add at least 2 image files to merge into a multi-page PDF.")
+            return
+
+        dest_dir = self._get_destination_dir() or images[0].parent
+        settings = self.collect_current_settings()
+        settings["batch_image_paths"] = [str(p) for p in images]
+        settings["output_filename"] = f"{images[0].stem}_combined.pdf"
+
+        self.job_requested.emit({
+            "source_path": images[0],
+            "target_format": "pdf",
+            "operation_id": "image.batch_to_pdf",
+            "engine": "pypdf",
+            "settings": settings,
+            "destination_path": dest_dir
+        })
+
+    def _combine_images_to_gif(self):
+        """Combine images into an animated GIF."""
+        images = self._get_target_image_paths()
+        if len(images) < 2:
+            self.notice_label.setText("⚠️ Please add at least 2 image files to merge into an animated GIF.")
+            return
+
+        dest_dir = self._get_destination_dir() or images[0].parent
+        settings = self.collect_current_settings()
+        settings["batch_image_paths"] = [str(p) for p in images]
+        settings["output_filename"] = f"{images[0].stem}_animation.gif"
+        if "fps" not in settings:
+            settings["fps"] = 2
+        if "loop" not in settings:
+            settings["loop"] = 0
+
+        self.job_requested.emit({
+            "source_path": images[0],
+            "target_format": "gif",
+            "operation_id": "image.batch_to_gif",
+            "engine": "pillow",
+            "settings": settings,
+            "destination_path": dest_dir
+        })
+
 
     def _inspect_extended_details(self, meta: FileMetadata) -> tuple[List[str], Dict[str, Any]]:
         """Perform deep inspection (dimensions, pages, streams, archive entries) and return extra info lines + flags."""

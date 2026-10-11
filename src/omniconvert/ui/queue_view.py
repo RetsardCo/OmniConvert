@@ -128,12 +128,27 @@ class QueueManagerView(QWidget):
         main_layout.setContentsMargins(24, 24, 24, 24)
         main_layout.setSpacing(16)
 
+        top_bar = QHBoxLayout()
+        title_box = QVBoxLayout()
         title = QLabel("Job Execution Queue")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
         desc = QLabel("Active, pending, and completed background conversions.")
         desc.setStyleSheet("color: #8a8f98; font-size: 13px;")
-        main_layout.addWidget(title)
-        main_layout.addWidget(desc)
+        title_box.addWidget(title)
+        title_box.addWidget(desc)
+        top_bar.addLayout(title_box)
+
+        top_bar.addStretch()
+
+        self.clear_finished_btn = QPushButton("Clear Finished")
+        self.clear_finished_btn.clicked.connect(self.clear_finished_jobs)
+        top_bar.addWidget(self.clear_finished_btn)
+
+        self.clear_all_btn = QPushButton("Clear All")
+        self.clear_all_btn.clicked.connect(self.clear_all_jobs)
+        top_bar.addWidget(self.clear_all_btn)
+
+        main_layout.addLayout(top_bar)
 
         # Scroll Area for Job Cards
         self.scroll = QScrollArea()
@@ -188,3 +203,28 @@ class QueueManagerView(QWidget):
         if job_id in self.cards:
             step_prefix = f"[{error.step}] " if error.step else ""
             self.cards[job_id].detail_lbl.setText(f"Error: {step_prefix}{error.message}")
+
+    def clear_finished_jobs(self):
+        """Remove completed, failed, or cancelled job cards from the queue."""
+        finished_ids = [
+            jid for jid, card in self.cards.items()
+            if card.job.state in (JobState.COMPLETED, JobState.COMPLETED_WITH_WARNINGS, JobState.FAILED, JobState.CANCELLED)
+        ]
+        for jid in finished_ids:
+            card = self.cards.pop(jid)
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+
+        if not self.cards:
+            self.empty_lbl.show()
+
+    def clear_all_jobs(self):
+        """Cancel any running jobs and remove all job cards."""
+        for jid, card in list(self.cards.items()):
+            if card.job.state in (JobState.QUEUED, JobState.RUNNING, JobState.WAITING_DEPENDENCY, JobState.VALIDATING):
+                self.job_manager.cancel_job(jid)
+            self.cards_layout.removeWidget(card)
+            card.deleteLater()
+        self.cards.clear()
+        self.empty_lbl.show()
+

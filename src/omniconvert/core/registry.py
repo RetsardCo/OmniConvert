@@ -134,7 +134,7 @@ class CapabilityRegistry:
             display_name="Convert to JPEG (Supports Lossless 4:4:4 Quality)",
             description="Convert raster/vector image to JPEG with configurable quality and 4:4:4 lossless chroma.",
             input_categories=["image"],
-            input_formats=["png", "webp", "bmp", "tiff", "tif", "gif", "ico", "svg", "jpeg", "jpg"],
+            input_formats=["png", "webp", "heic", "heif", "bmp", "tiff", "tif", "gif", "ico", "svg", "jpeg", "jpg"],
             output_category="image",
             output_format="jpeg",
             engine="pillow",
@@ -162,7 +162,7 @@ class CapabilityRegistry:
             display_name="Convert to PNG (Lossless)",
             description="Convert image to 100% lossless PNG format with alpha channel support.",
             input_categories=["image"],
-            input_formats=["jpeg", "jpg", "webp", "bmp", "tiff", "tif", "ico", "gif", "svg", "png"],
+            input_formats=["jpeg", "jpg", "webp", "heic", "heif", "bmp", "tiff", "tif", "ico", "gif", "svg", "png"],
             output_category="image",
             output_format="png",
             engine="pillow",
@@ -181,7 +181,7 @@ class CapabilityRegistry:
             display_name="Convert to WebP (Lossless or Compressed)",
             description="Convert image to modern WebP format with optional true lossless mode.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "jpg", "bmp", "tiff", "tif", "gif", "svg"],
+            input_formats=["png", "jpeg", "jpg", "heic", "heif", "bmp", "tiff", "tif", "gif", "svg"],
             output_category="image",
             output_format="webp",
             engine="pillow",
@@ -201,7 +201,7 @@ class CapabilityRegistry:
             display_name="Convert to BMP (Uncompressed)",
             description="Convert image to uncompressed Windows Bitmap.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "jpg", "webp", "tiff", "tif", "gif", "svg"],
+            input_formats=["png", "jpeg", "jpg", "webp", "heic", "heif", "tiff", "tif", "gif", "svg"],
             output_category="image",
             output_format="bmp",
             engine="pillow",
@@ -215,7 +215,7 @@ class CapabilityRegistry:
             display_name="Convert to TIFF (Lossless LZW)",
             description="Convert image to archival lossless TIFF format.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "gif", "svg"],
+            input_formats=["png", "jpeg", "jpg", "webp", "heic", "heif", "bmp", "gif", "svg"],
             output_category="image",
             output_format="tiff",
             engine="pillow",
@@ -250,6 +250,24 @@ class CapabilityRegistry:
             lossy=True,
             limitations=["GIF uses a 256-color palette per frame."]
         ))
+
+        self.register(Capability(
+            id="image.batch_to_gif",
+            display_name="Combine Multiple Images into Animated GIF (.gif)",
+            description="Sequence multiple selected images into a single animated GIF with custom frame timing.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "heic", "heif"],
+            output_category="image",
+            output_format="gif",
+            engine="pillow",
+            operation="images_to_gif",
+            lossy=True,
+            settings_schema={
+                "fps": {"type": "int", "min": 1, "max": 60, "default": 2, "label": "Animation Speed (FPS)"},
+                "loop": {"type": "int", "min": 0, "max": 100, "default": 0, "label": "Loop Count (0 = Infinite)"}
+            }
+        ))
+
 
         self.register(Capability(
             id="image.extract_frames",
@@ -423,7 +441,7 @@ class CapabilityRegistry:
             display_name="Wrap Image into PDF",
             description="Convert and embed image into a print-ready PDF page.",
             input_categories=["image"],
-            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "heic", "heif"],
             output_category="document",
             output_format="pdf",
             engine="pypdf",
@@ -434,6 +452,24 @@ class CapabilityRegistry:
                 "dpi": {"type": "int", "min": 72, "max": 600, "default": 300, "label": "PDF Resolution (DPI)"}
             }
         ))
+
+        self.register(Capability(
+            id="image.batch_to_pdf",
+            display_name="Combine Multiple Images into 1 Multi-Page PDF (.pdf)",
+            description="Merge a batch of images into a single multi-page PDF where each image is a full page.",
+            input_categories=["image"],
+            input_formats=["png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "heic", "heif", "gif"],
+            output_category="document",
+            output_format="pdf",
+            engine="pypdf",
+            operation="images_to_pdf",
+            lossy=False,
+            settings_schema={
+                "quality_preset": QUALITY_PRESET_SCHEMA,
+                "dpi": {"type": "int", "min": 72, "max": 600, "default": 300, "label": "PDF Resolution (DPI)"}
+            }
+        ))
+
 
         self.register(Capability(
             id="office.to_txt",
@@ -641,7 +677,7 @@ class CapabilityRegistry:
         # =====================================================================
         # 4. Media: Audio & Video (FFmpeg Engine)
         # =====================================================================
-        all_video_inputs = ["mp4", "mkv", "avi", "mov", "webm", "wmv", "flv", "mpeg"]
+        all_video_inputs = ["mp4", "mkv", "avi", "mov", "webm", "wmv", "flv", "mpeg", "hevc", "h265"]
         all_audio_inputs = ["wav", "mp3", "flac", "aac", "ogg", "opus", "m4a", "aiff", "wma"]
         audio_settings = {
             "quality_preset": QUALITY_PRESET_SCHEMA,

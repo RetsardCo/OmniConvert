@@ -19,11 +19,18 @@ QUALITY_PRESET_MAP = {
 }
 
 
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
+
 class ImageEngine(BaseEngine):
-    """Executes raster and vector image conversions and transformations using Pillow and PyMuPDF."""
+    """Executes raster and vector image conversions and transformations using Pillow, pillow-heif, and PyMuPDF."""
 
     def __init__(self):
-        self._supported_formats = {"png", "jpeg", "jpg", "webp", "bmp", "tiff", "tif", "ico", "gif", "svg"}
+        self._supported_formats = {"png", "jpeg", "jpg", "webp", "heic", "heif", "bmp", "tiff", "tif", "ico", "gif", "svg"}
 
     @property
     def name(self) -> str:
@@ -52,6 +59,13 @@ class ImageEngine(BaseEngine):
         source = job.source_path
         target_format = job.target_format.lower().lstrip(".")
         settings = job.settings or {}
+
+        # 0. Batch Images to Animated GIF
+        if job.operation_id == "image.batch_to_gif" or (target_format == "gif" and settings.get("batch_image_paths")):
+            raw_paths = settings.get("batch_image_paths", [])
+            paths = [Path(p) for p in raw_paths] if raw_paths else [source]
+            target_name = settings.get("output_filename", f"{source.stem}_animation.gif")
+            return self.images_to_gif(paths, workspace_dir / target_name, settings, progress_callback, is_cancelled)
 
         if progress_callback:
             progress_callback(JobProgress(percentage=10.0, stage="Opening image", detail=f"Loading {source.name}"))
@@ -312,3 +326,66 @@ class ImageEngine(BaseEngine):
                 ))
 
         return frames_dir
+
+    def images_to_gif(
+        self,
+        image_paths: List[Path],
+        output_path: Path,
+        settings: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[JobProgress], None]] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None
+    ) -> Path:
+        """Combine multiple images into an animated GIF."""
+        if not image_paths:
+            raise ValueError("No images provided for GIF creation.")
+
+        settings = settings or {}
+        fps = int(settings.get("fps", 2))
+        loop = int(settings.get("loop", 0))  # 0 = infinite loop
+        duration_ms = int(settings.get("duration", 1000 // max(1, fps)))
+
+        total = len(image_paths)
+        frames = []
+        try:
+            for idx, p in enumerate(image_paths):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("Cancelled during batch image-to-GIF conversion.")
+                if progress_callback:
+                    progress_callback(JobProgress(
+                        percentage=int((idx / max(1, total)) * 80),
+                        stage="Processing Frames",
+                        detail=f"Loading frame {idx + 1}/{total}: {p.name}"
+                    ))
+                with Image.open(p) as img:
+                    # Convert to RGBA for consistent handling
+                    frame = img.convert("RGBA")
+                    frames.append(frame)
+
+            if is_cancelled and is_cancelled():
+                raise InterruptedError("Cancelled before saving GIF.")
+
+            if progress_callback:
+                progress_callback(JobProgress(percentage=85.0, stage="Encoding GIF", detail=f"Assembling {total} frames into animated GIF"))
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if frames:
+                first = frames[0]
+                rest = frames[1:]
+                first.save(
+                    output_path,
+                    format="GIF",
+                    save_all=True,
+                    append_images=rest,
+                    duration=duration_ms,
+                    loop=loop,
+                    optimize=True
+                )
+
+            if progress_callback:
+                progress_callback(JobProgress(percentage=100.0, stage="Complete", detail=f"Created animated GIF from {total} images"))
+
+            return output_path
+        finally:
+            for f in frames:
+                f.close()
+

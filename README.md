@@ -28,12 +28,14 @@ All conversions run **100% locally on your machine**. Your sensitive files, docu
 
 - **🔒 Local & Private**: Completely offline processing. Zero telemetry on file contents.
 - **📄 Full Office & PDF Suite**: Bi-directional conversion between **PDF and Word (.docx)**, Excel (`.xlsx`), PowerPoint (`.pptx`), HTML, Markdown, and TXT without needing Microsoft Office installed.
+- **📱 Apple iOS Photo & Video**: Native support for Apple **HEIC / HEIF** photos (lossless conversion to PNG/TIFF/JPEG/WebP) and **HEVC (H.265)** high-efficiency video.
+- **📦 Batch Image Tools**: Combine multiple images into a **single multi-page PDF** (1 page per image) or an **animated GIF** with custom FPS in a single click.
 - **🖼️ Lossless & Precision Quality Presets**: Choose between **Lossless / Exact (100% detail)**, **High Detail**, **Balanced**, or **Compact Size** across images, audio, and video.
 - **🎬 Professional Media Engine**: Powered by local FFmpeg 9+ for high-fidelity audio/video transcoding, audio extraction, animated GIF generation, and stream inspection.
 - **📦 Protected Archive Engine**: Safe extraction and creation for **ZIP**, **7Z**, **TAR**, and **GZ** with built-in path-traversal safeguards (*Zip Slip* protection) and decompression bomb limits.
 - **🔄 Multi-Step Workflow Engine**: Execute chained pipelines such as `Document ➔ Text ➔ Spoken Audio (WAV)`, `Folder/Archive ➔ Merged PDF`, or `CSV ➔ Animated Video Chart`.
 - **🔍 Content-Based Sniffing**: Inspects magic bytes and headers rather than blindly trusting file extensions.
-- **🎨 Windows-Native UI**: Dark and light themes, drag-and-drop input, real-time background job queue, and searchable format matrix.
+- **🎨 Windows-Native UI**: Dark and light themes, drag-and-drop input, granular "Remove Selected" file control, "Clear Finished" job queue management, and searchable format matrix.
 
 ---
 

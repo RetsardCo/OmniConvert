@@ -128,9 +128,11 @@ class JobExecutionRunnable(QRunnable):
                                 break
                             counter += 1
             else:
+                custom_name = (self.job.settings or {}).get("output_filename")
+                base_stem = Path(custom_name).stem if custom_name else self.job.source_path.stem
                 final_target = resolve_output_collision(
                     output_dir=dest_dir,
-                    stem=self.job.source_path.stem,
+                    stem=base_stem,
                     target_ext=self.job.target_format,
                     policy=self.collision_policy
                 )

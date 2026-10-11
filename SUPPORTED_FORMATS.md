@@ -24,7 +24,8 @@ All conversions listed below are **100% local and offline** (no cloud APIs or ex
 | `pdf.to_md` | `pdf` | `md` | `pypdf` (`PyMuPDF`) | — | Extracts PDF pages into Markdown sections. |
 | `pdf.extract_text` | `pdf` | `txt` | `pypdf` | Password support | Extracts embedded text streams; scanned PDFs without a text layer require `ocr.image_to_txt`. |
 | `pdf.to_json` | `pdf` | `json` | `pypdf` | Password support | Exports document metadata and per-page text to JSON. |
-| `image.to_pdf` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif` | `pdf` | `pypdf` (`Pillow`) | Quality Preset, DPI (`72`–`600`, default `300`) | Wraps raster images into a standard PDF page at exact physical DPI. |
+| `image.to_pdf` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `heic`, `heif` | `pdf` | `pypdf` (`Pillow`) | Quality Preset, DPI (`72`–`600`, default `300`) | Wraps raster images into a standard PDF page at exact physical DPI. |
+| `image.batch_to_pdf` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `heic`, `heif`, `gif` | `pdf` | `pypdf` (`Pillow`) | Quality Preset, DPI (`72`–`600`, default `300`) | **Batch Merge to 1 Multi-Page PDF**: Combines any number of loaded or selected images into a single multi-page PDF where each image is an individual page. |
 
 ---
 
@@ -32,12 +33,13 @@ All conversions listed below are **100% local and offline** (no cloud APIs or ex
 
 | Operation ID | Source Formats | Target Format | Engine | Quality / Detail Controls | Notes & Limitations |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `image.to_jpeg` | `png`, `webp`, `bmp`, `tiff`, `tif`, `gif`, `ico`, `svg`, `jpeg`, `jpg` | `jpeg` | `pillow` | Quality (`1`–`100`, default `100`), Subsampling (`4:4:4` at Lossless/Exact), Resize, Rotate, Crop, BG Color | At **Lossless / Exact Quality (100%)**, encodes with `quality=100, subsampling=0 (4:4:4)` for zero chroma subsampling loss. Flattens alpha channel onto configurable background color. |
-| `image.to_png` | `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `ico`, `gif`, `svg`, `png` | `png` | `pillow` | Lossless compression, Resize, Rotate, Crop | 100% lossless pixel preservation including RGBA transparency. |
-| `image.to_webp` | `png`, `jpeg`, `jpg`, `bmp`, `tiff`, `tif`, `gif`, `svg` | `webp` | `pillow` | Quality (`1`–`100`), True Lossless WebP toggle (`default=True`), Resize, Rotate | Defaults to true lossless WebP (`lossless=True`) in Lossless/Exact mode; supports lossy WebP in Balanced/Compact modes. |
-| `image.to_bmp` | `png`, `jpeg`, `jpg`, `webp`, `tiff`, `tif`, `gif`, `svg` | `bmp` | `pillow` | Resize, Rotate | Uncompressed Windows Bitmap output. |
-| `image.to_tiff` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `gif`, `svg` | `tiff` | `pillow` | Lossless LZW compression | Archival lossless TIFF output. |
+| `image.to_jpeg` | `png`, `webp`, `bmp`, `tiff`, `tif`, `gif`, `ico`, `svg`, `heic`, `heif`, `jpeg`, `jpg` | `jpeg` | `pillow` (`pillow-heif`) | Quality (`1`–`100`, default `100`), Subsampling (`4:4:4` at Lossless/Exact), Resize, Rotate, Crop, BG Color | At **Lossless / Exact Quality (100%)**, encodes with `quality=100, subsampling=0 (4:4:4)` for zero chroma subsampling loss. Flattens alpha channel onto configurable background color. |
+| `image.to_png` | `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `ico`, `gif`, `svg`, `heic`, `heif`, `png` | `png` | `pillow` (`pillow-heif`) | Lossless compression, Resize, Rotate, Crop | 100% lossless pixel preservation including RGBA transparency. Supports Apple HEIC/HEIF photo conversion. |
+| `image.to_webp` | `png`, `jpeg`, `jpg`, `bmp`, `tiff`, `tif`, `gif`, `svg`, `heic`, `heif` | `webp` | `pillow` (`pillow-heif`) | Quality (`1`–`100`), True Lossless WebP toggle (`default=True`), Resize, Rotate | Defaults to true lossless WebP (`lossless=True`) in Lossless/Exact mode; supports lossy WebP in Balanced/Compact modes. |
+| `image.to_bmp` | `png`, `jpeg`, `jpg`, `webp`, `tiff`, `tif`, `gif`, `svg`, `heic`, `heif` | `bmp` | `pillow` (`pillow-heif`) | Resize, Rotate | Uncompressed Windows Bitmap output. |
+| `image.to_tiff` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `gif`, `svg`, `heic`, `heif` | `tiff` | `pillow` (`pillow-heif`) | Lossless LZW compression | Archival lossless TIFF output. |
 | `image.to_gif` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `svg` | `gif` | `pillow` | — | 256-color palette GIF output. |
+| `image.batch_to_gif` | `png`, `jpeg`, `jpg`, `webp`, `bmp`, `tiff`, `tif`, `heic`, `heif` | `gif` | `pillow` | FPS (`1`–`60`, default `2`), Loop Count (`0`=Infinite) | **Batch Merge to Animated GIF**: Combines any sequence of loaded or selected images into a single animated GIF with custom frame timing. |
 | `image.to_ico` | `png`, `jpeg`, `jpg`, `bmp`, `webp`, `svg` | `ico` | `pillow` | Multi-resolution icon bundle | Generates multi-resolution Windows `.ico` (`16x16` through `256x256`). |
 | `image.extract_frames` | `gif` | `dir` | `pillow` | — | Extracts all animation frames from an animated GIF into lossless PNG images. |
 

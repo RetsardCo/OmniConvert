@@ -101,6 +101,8 @@ EXTENSION_MAP = {
     "jpg": ("jpeg", "image", "image/jpeg"),
     "jpeg": ("jpeg", "image", "image/jpeg"),
     "webp": ("webp", "image", "image/webp"),
+    "heic": ("heic", "image", "image/heic"),
+    "heif": ("heif", "image", "image/heif"),
     "bmp": ("bmp", "image", "image/bmp"),
     "ico": ("ico", "image", "image/x-icon"),
     "tiff": ("tiff", "image", "image/tiff"),
@@ -128,6 +130,9 @@ EXTENSION_MAP = {
     "webm": ("webm", "video", "video/webm"),
     "wmv": ("wmv", "video", "video/x-ms-wmv"),
     "flv": ("flv", "video", "video/x-flv"),
+    "hevc": ("hevc", "video", "video/mp4"),
+    "265": ("hevc", "video", "video/mp4"),
+    "h265": ("hevc", "video", "video/mp4"),
     "mpeg": ("mpeg", "video", "video/mpeg"),
     "mpg": ("mpeg", "video", "video/mpeg"),
 
@@ -260,10 +265,12 @@ def inspect_file(file_path: Path | str) -> FileMetadata:
     if not detected_format and header.startswith(b"PK\x03\x04") and ext in ("docx", "xlsx", "pptx", "odt", "odp"):
         detected_format, detected_category, detected_mime = EXTENSION_MAP[ext]
 
-    # 3. Handle ISO Base Media File Format (ftyp: mp4, mov, m4a)
+    # 3. Handle ISO Base Media File Format (ftyp: mp4, mov, m4a, heic)
     if not detected_format and len(header) >= 12 and header[4:8] == b"ftyp":
         brand = header[8:12]
-        if brand == b"M4A " or ext == "m4a":
+        if brand in (b"heic", b"heix", b"hevc", b"hevx", b"mif1", b"msf1") or ext in ("heic", "heif"):
+            detected_format, detected_category, detected_mime = ("heic", "image", "image/heic")
+        elif brand == b"M4A " or ext == "m4a":
             detected_format, detected_category, detected_mime = EXTENSION_MAP["m4a"]
         elif brand == b"qt  " or ext == "mov":
             detected_format, detected_category, detected_mime = EXTENSION_MAP["mov"]

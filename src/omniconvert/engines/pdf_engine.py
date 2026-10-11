@@ -45,8 +45,15 @@ class PDFEngine(BaseEngine):
         settings = job.settings or {}
         op = job.operation_id
 
+        # 0. Batch Images to Multi-Page PDF
+        if op == "image.batch_to_pdf" or settings.get("batch_image_paths"):
+            raw_paths = settings.get("batch_image_paths", [])
+            paths = [Path(p) for p in raw_paths] if raw_paths else [source]
+            target_name = settings.get("output_filename", f"{source.stem}_combined.pdf")
+            return self.images_to_pdf(paths, workspace_dir / target_name, settings, progress_callback, is_cancelled)
+
         # 1. Image to PDF
-        if op == "image.to_pdf" or source.suffix.lower().lstrip(".") in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"):
+        if op == "image.to_pdf" or source.suffix.lower().lstrip(".") in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "heic", "heif"):
             return self._image_to_pdf(source, workspace_dir, settings, progress_callback, is_cancelled)
 
         # 2. PDF to Word (.docx)
@@ -485,3 +492,63 @@ class PDFEngine(BaseEngine):
             writer.write(f)
         writer.close()
         return output_path
+
+    def images_to_pdf(
+        self,
+        image_paths: List[Path],
+        output_path: Path,
+        settings: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[JobProgress], None]] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None
+    ) -> Path:
+        """Combine multiple images into a single multi-page PDF document (1 image per page)."""
+        if not image_paths:
+            raise ValueError("No images provided for PDF combination.")
+
+        settings = settings or {}
+        preset = str(settings.get("quality_preset", "lossless")).lower()
+        resolution = float(settings.get("dpi", 300.0 if preset in ("lossless", "exact") else 150.0))
+
+        total = len(image_paths)
+        converted_images = []
+        try:
+            for idx, p in enumerate(image_paths):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("Cancelled during batch image-to-PDF conversion.")
+                if progress_callback:
+                    progress_callback(JobProgress(
+                        percentage=int((idx / max(1, total)) * 80),
+                        stage="Processing Images",
+                        detail=f"Loading page {idx + 1}/{total}: {p.name}"
+                    ))
+                with Image.open(p) as img:
+                    if img.mode != "RGB":
+                        rgb_img = Image.new("RGB", img.size, (255, 255, 255))
+                        if img.mode == "RGBA":
+                            rgb_img.paste(img, mask=img.split()[3])
+                        else:
+                            rgb_img.paste(img.convert("RGB"))
+                        converted_images.append(rgb_img)
+                    else:
+                        converted_images.append(img.copy())
+
+            if is_cancelled and is_cancelled():
+                raise InterruptedError("Cancelled before saving PDF.")
+
+            if progress_callback:
+                progress_callback(JobProgress(percentage=85.0, stage="Saving PDF", detail=f"Writing {total} pages to {output_path.name}"))
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if converted_images:
+                first = converted_images[0]
+                rest = converted_images[1:]
+                first.save(output_path, "PDF", resolution=resolution, save_all=True, append_images=rest)
+
+            if progress_callback:
+                progress_callback(JobProgress(percentage=100.0, stage="Complete", detail=f"Combined {total} images into multi-page PDF"))
+
+            return output_path
+        finally:
+            for im in converted_images:
+                im.close()
+
