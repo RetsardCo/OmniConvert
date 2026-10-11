@@ -216,20 +216,20 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ## Phase 7 — Structured Data and Text
 
-- [ ] Implement JSON parsing and serialization.
-- [ ] Implement CSV parsing and serialization.
-- [ ] Implement JSON-to-CSV with an explicit flattening/schema strategy.
-- [ ] Implement CSV-to-JSON.
-- [ ] Implement supported JSON-to-YAML and YAML-to-JSON routes.
-- [ ] Add XML operations only with a suitable parser and safe parser configuration.
-- [ ] Implement text encoding conversion where reliably detectable or user-selected.
-- [ ] Implement line-ending conversion.
-- [ ] Handle nested structures and incompatible schemas explicitly.
-- [ ] Validate outputs by parsing them again.
-- [ ] Test malformed input, empty files, unusual Unicode, and delimiter edge cases.
+- [x] Implement JSON parsing and serialization.
+- [x] Implement CSV parsing and serialization.
+- [x] Implement JSON-to-CSV with an explicit flattening/schema strategy.
+- [x] Implement CSV-to-JSON.
+- [x] Implement supported JSON-to-YAML and YAML-to-JSON routes.
+- [x] Add XML operations only with a suitable parser and safe parser configuration.
+- [x] Implement text encoding conversion where reliably detectable or user-selected.
+- [x] Implement line-ending conversion.
+- [x] Handle nested structures and incompatible schemas explicitly.
+- [x] Validate outputs by parsing them again.
+- [x] Test malformed input, empty files, unusual Unicode, and delimiter edge cases.
 
 **Acceptance criteria**
-- [ ] Structured-data outputs parse correctly and schema/flattening limitations are explained.
+- [x] Structured-data outputs parse correctly and schema/flattening limitations are explained.
 
 ---
 

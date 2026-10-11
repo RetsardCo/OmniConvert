@@ -239,7 +239,7 @@ class CapabilityRegistry:
             limitations=["Formatting and embedded images are stripped."]
         ))
 
-        # 3. Structured Data (Data Engine)
+        # 3. Structured Data & Text (Data Engine)
         self.register(Capability(
             id="data.csv_to_json",
             display_name="Convert CSV to JSON",
@@ -265,6 +265,84 @@ class CapabilityRegistry:
             operation="json_to_csv",
             lossy=True,
             limitations=["Deeply nested keys are flattened or converted to strings."]
+        ))
+
+        self.register(Capability(
+            id="data.json_to_yaml",
+            display_name="Convert JSON to YAML",
+            description="Serialize JSON structure to clean, human-readable YAML.",
+            input_categories=["data"],
+            input_formats=["json"],
+            output_category="data",
+            output_format="yaml",
+            engine="data",
+            operation="json_to_yaml",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="data.yaml_to_json",
+            display_name="Convert YAML to JSON",
+            description="Parse YAML configuration into standard JSON.",
+            input_categories=["data"],
+            input_formats=["yaml", "yml"],
+            output_category="data",
+            output_format="json",
+            engine="data",
+            operation="yaml_to_json",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="data.xml_to_json",
+            display_name="Convert XML to JSON",
+            description="Safely parse XML document into nested JSON structure.",
+            input_categories=["data"],
+            input_formats=["xml"],
+            output_category="data",
+            output_format="json",
+            engine="data",
+            operation="xml_to_json",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="data.json_to_xml",
+            display_name="Convert JSON to XML",
+            description="Serialize JSON object hierarchy into standard XML elements.",
+            input_categories=["data"],
+            input_formats=["json"],
+            output_category="data",
+            output_format="xml",
+            engine="data",
+            operation="json_to_xml",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="text.to_crlf",
+            display_name="Convert Line Endings to Windows (CRLF)",
+            description="Convert Unix (LF) newlines to Windows standard (CRLF).",
+            input_categories=["text", "data"],
+            input_formats=["txt", "csv", "json", "yaml", "xml", "md"],
+            output_category="text",
+            output_format="txt",
+            engine="data",
+            operation="to_crlf",
+            lossy=False
+        ))
+
+        self.register(Capability(
+            id="text.to_lf",
+            display_name="Convert Line Endings to Unix (LF)",
+            description="Convert Windows (CRLF) newlines to Unix standard (LF).",
+            input_categories=["text", "data"],
+            input_formats=["txt", "csv", "json", "yaml", "xml", "md"],
+            output_category="text",
+            output_format="txt",
+            engine="data",
+            operation="to_lf",
+            lossy=False
         ))
 
         # 4. Media (FFmpeg Engine)
