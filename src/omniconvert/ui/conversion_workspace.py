@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
     QListWidget, QListWidgetItem, QComboBox, QTextEdit, QFileDialog,
     QSplitter, QFormLayout, QSpinBox, QCheckBox, QLineEdit,
-    QScrollArea
+    QScrollArea, QMessageBox
 )
 
 from omniconvert.core.file_detector import inspect_file, FileMetadata
@@ -35,6 +35,7 @@ class ConversionWorkspaceView(QWidget):
         self._setting_widgets: Dict[str, QWidget] = {}
         self._media_inspector = MediaInspector()
         self._archive_engine = ArchiveEngine()
+        self.setAcceptDrops(True)
 
         self._init_ui()
 
@@ -63,15 +64,11 @@ class ConversionWorkspaceView(QWidget):
         add_folder_btn = QPushButton("+ Add Folder")
         add_folder_btn.clicked.connect(self._browse_add_folder)
 
-        remove_btn = QPushButton("Remove Selected")
-        remove_btn.clicked.connect(self.remove_selected_files)
-
         clear_btn = QPushButton("Clear All")
-        clear_btn.clicked.connect(self.clear_files)
+        clear_btn.clicked.connect(self.clear_files_confirmed)
 
         top_bar.addWidget(add_btn)
         top_bar.addWidget(add_folder_btn)
-        top_bar.addWidget(remove_btn)
         top_bar.addWidget(clear_btn)
         main_layout.addLayout(top_bar)
 
@@ -92,14 +89,17 @@ class ConversionWorkspaceView(QWidget):
 
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.ExtendedSelection)
+        self.file_list.setAcceptDrops(True)
         self.file_list.currentRowChanged.connect(self._on_file_selected)
         left_layout.addWidget(self.file_list)
 
         file_btns = QHBoxLayout()
         self.remove_file_btn = QPushButton("Remove Selected")
+        self.remove_file_btn.setToolTip("Remove highlighted file(s) from workspace (Del or Backspace)")
         self.remove_file_btn.clicked.connect(self.remove_selected_files)
         self.clear_all_btn = QPushButton("Clear All")
-        self.clear_all_btn.clicked.connect(self.clear_files)
+        self.clear_all_btn.setToolTip("Clear all files and reset workspace")
+        self.clear_all_btn.clicked.connect(self.clear_files_confirmed)
         file_btns.addWidget(self.remove_file_btn)
         file_btns.addWidget(self.clear_all_btn)
         left_layout.addLayout(file_btns)
@@ -157,7 +157,8 @@ class ConversionWorkspaceView(QWidget):
 
         self.op_filter_edit = QLineEdit()
         self.op_filter_edit.setPlaceholderText("🔍 Filter operations (e.g. docx, pdf, mp3, wav)...")
-        self.op_filter_edit.setFixedWidth(250)
+        self.op_filter_edit.setMinimumWidth(180)
+        self.op_filter_edit.setMaximumWidth(320)
         self.op_filter_edit.textChanged.connect(self._rebuild_operation_combo)
         op_header_row.addWidget(self.op_filter_edit)
         right_layout.addLayout(op_header_row)
@@ -179,6 +180,14 @@ class ConversionWorkspaceView(QWidget):
         self.quality_preset_combo.addItem("⚖️ Balanced (Standard - 85% / 192 kbps / 150 DPI)", "balanced")
         self.quality_preset_combo.addItem("⚡ Compact / Fast (Compressed - 70% / 128 kbps / 96 DPI)", "compact")
         self.quality_preset_combo.addItem("🎛️ Custom (Adjust Fine-Grained Controls Below)", "custom")
+
+        self.quality_preset_combo.setItemData(0, "Lossless / Exact: 100% quality, 4:4:4 lossless chroma, True Lossless WebP/AVIF, 24-bit PCM/ALAC audio, CRF 14 video, 300 DPI document rasterization.", Qt.ToolTipRole)
+        self.quality_preset_combo.setItemData(1, "High Quality: 95% quality, 256 kbps audio, CRF 18 visually transparent video, 250 DPI rendering.", Qt.ToolTipRole)
+        self.quality_preset_combo.setItemData(2, "Balanced: Standard 85% quality, 192 kbps audio, CRF 23 video, 150 DPI rendering. Excellent size-to-quality balance.", Qt.ToolTipRole)
+        self.quality_preset_combo.setItemData(3, "Compact / Fast: 70% quality, 128 kbps audio, CRF 28 video, 96 DPI rendering. Optimized for small file sizes.", Qt.ToolTipRole)
+        self.quality_preset_combo.setItemData(4, "Custom: Fully manual configuration using the sliders and inputs below.", Qt.ToolTipRole)
+        self.quality_preset_combo.setToolTip("Select global conversion detail and compression fidelity preset.")
+
         self.quality_preset_combo.currentIndexChanged.connect(self._on_quality_preset_changed)
         quality_row.addWidget(self.quality_preset_combo, stretch=1)
         right_layout.addLayout(quality_row)
@@ -187,14 +196,15 @@ class ConversionWorkspaceView(QWidget):
         self.settings_scroll = QScrollArea()
         self.settings_scroll.setObjectName("settingsScroll")
         self.settings_scroll.setWidgetResizable(True)
-        self.settings_scroll.setMaximumHeight(150)
+        self.settings_scroll.setMinimumHeight(140)
         self.settings_container = QWidget()
         self.settings_container.setObjectName("settingsContainer")
         self.settings_form = QFormLayout(self.settings_container)
-        self.settings_form.setContentsMargins(12, 8, 12, 8)
-        self.settings_form.setSpacing(6)
+        self.settings_form.setContentsMargins(12, 10, 12, 10)
+        self.settings_form.setSpacing(8)
+        self.settings_form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
         self.settings_scroll.setWidget(self.settings_container)
-        right_layout.addWidget(self.settings_scroll)
+        right_layout.addWidget(self.settings_scroll, stretch=1)
 
         # Output Folder Selector
         out_row = QHBoxLayout()
@@ -214,8 +224,6 @@ class ConversionWorkspaceView(QWidget):
         self.notice_label.setWordWrap(True)
         self.notice_label.setStyleSheet("color: #d97706; font-size: 12px;")
         right_layout.addWidget(self.notice_label)
-
-        right_layout.addStretch()
 
         # Action: Convert Selected & Convert All Batch Buttons
         bottom_box = QHBoxLayout()
@@ -240,8 +248,8 @@ class ConversionWorkspaceView(QWidget):
         right_layout.addLayout(bottom_box)
 
         splitter.addWidget(right_card)
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 6)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 7)
 
         main_layout.addWidget(splitter)
 
@@ -279,6 +287,20 @@ class ConversionWorkspaceView(QWidget):
         if self.file_list.count() > 0 and self.file_list.currentRow() == -1:
             self.file_list.setCurrentRow(0)
 
+    def clear_files_confirmed(self):
+        """Prompt user for confirmation before clearing all workspace files."""
+        if not self.files_meta:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Clear Workspace",
+            f"Are you sure you want to remove all {len(self.files_meta)} file(s) from the workspace?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.clear_files()
+
     def clear_files(self):
         self.files_meta.clear()
         self.file_list.clear()
@@ -313,6 +335,21 @@ class ConversionWorkspaceView(QWidget):
             self.file_list.setCurrentRow(max(0, new_row))
         else:
             self.clear_files()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        file_paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
+        if file_paths:
+            self.add_files(file_paths)
+        event.acceptProposedAction()
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
@@ -583,6 +620,7 @@ class ConversionWorkspaceView(QWidget):
                 spin = QSpinBox()
                 spin.setRange(int(spec.get("min", 0)), int(spec.get("max", 10000)))
                 spin.setValue(int(default_val if default_val is not None else 0))
+                spin.setMinimumHeight(28)
                 self._setting_widgets[key] = spin
                 self.settings_form.addRow(f"{label_txt}:", spin)
 
@@ -592,17 +630,20 @@ class ConversionWorkspaceView(QWidget):
                 combo.addItems(values)
                 if str(default_val) in values:
                     combo.setCurrentText(str(default_val))
+                combo.setMinimumHeight(28)
                 self._setting_widgets[key] = combo
                 self.settings_form.addRow(f"{label_txt}:", combo)
 
             elif stype == "bool":
                 chk = QCheckBox()
                 chk.setChecked(bool(default_val))
+                chk.setMinimumHeight(24)
                 self._setting_widgets[key] = chk
                 self.settings_form.addRow(f"{label_txt}:", chk)
 
             else:
                 edit = QLineEdit(str(default_val or ""))
+                edit.setMinimumHeight(28)
                 self._setting_widgets[key] = edit
                 self.settings_form.addRow(f"{label_txt}:", edit)
 

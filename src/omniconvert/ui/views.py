@@ -6,7 +6,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QComboBox,
-    QSpinBox, QCheckBox, QFileDialog, QFormLayout, QTextEdit
+    QSpinBox, QCheckBox, QFileDialog, QFormLayout, QTextEdit, QMessageBox
 )
 
 from omniconvert.config.settings import AppSettings
@@ -64,6 +64,7 @@ class HistoryView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.cellDoubleClicked.connect(self._on_row_double_clicked)
         layout.addWidget(self.table)
 
         self.refresh()
@@ -90,6 +91,17 @@ class HistoryView(QWidget):
             for c_idx, val in enumerate(vals):
                 self.table.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
 
+    def _on_row_double_clicked(self, row: int, _col: int):
+        """Double clicking a history row opens the converted file or its folder."""
+        if 0 <= row < len(self.records):
+            rec = self.records[row]
+            if rec.destination_path:
+                dest = Path(rec.destination_path)
+                if dest.exists():
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(str(dest)))
+                    return
+            self._open_selected_folder()
+
     def _open_selected_folder(self):
         row = self.table.currentRow()
         if 0 <= row < len(self.records):
@@ -113,8 +125,18 @@ class HistoryView(QWidget):
                 })
 
     def _clear_history(self):
-        self.history_manager.clear()
-        self.refresh()
+        if not self.records:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Clear History",
+            f"Are you sure you want to permanently clear all {len(self.records)} history records?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.history_manager.clear()
+            self.refresh()
 
 
 class FormatExplorerView(QWidget):

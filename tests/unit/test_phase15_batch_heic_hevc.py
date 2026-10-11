@@ -143,8 +143,11 @@ def test_queue_view_clear_buttons(tmp_path: Path):
     assert len(queue_view.cards) == 1
     assert job3.id in queue_view.cards
 
-    # Clear all should cancel running job and empty cards
-    queue_view.clear_all_jobs()
+    # Clear all should cancel running job and empty cards (mocking QMessageBox.question to Yes)
+    from unittest.mock import patch
+    from PySide6.QtWidgets import QMessageBox
+    with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes):
+        queue_view.clear_all_jobs()
     assert len(queue_view.cards) == 0
     assert not queue_view.empty_lbl.isHidden()
 

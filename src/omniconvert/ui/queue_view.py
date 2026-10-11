@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, Slot, Signal, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QProgressBar, QScrollArea
+    QProgressBar, QScrollArea, QMessageBox
 )
 
 from omniconvert.models.conversion_job import ConversionJob, JobState, JobProgress, JobError
@@ -219,7 +219,25 @@ class QueueManagerView(QWidget):
             self.empty_lbl.show()
 
     def clear_all_jobs(self):
-        """Cancel any running jobs and remove all job cards."""
+        """Cancel any running jobs and remove all job cards with confirmation if jobs are running."""
+        if not self.cards:
+            return
+
+        active_jobs = [
+            card.job for card in self.cards.values()
+            if card.job.state in (JobState.QUEUED, JobState.RUNNING, JobState.WAITING_DEPENDENCY, JobState.VALIDATING)
+        ]
+        if active_jobs:
+            reply = QMessageBox.question(
+                self,
+                "Cancel Active Jobs",
+                f"There are {len(active_jobs)} running/queued job(s). Are you sure you want to cancel and clear all jobs?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
         for jid, card in list(self.cards.items()):
             if card.job.state in (JobState.QUEUED, JobState.RUNNING, JobState.WAITING_DEPENDENCY, JobState.VALIDATING):
                 self.job_manager.cancel_job(jid)

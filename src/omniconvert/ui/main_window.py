@@ -36,8 +36,8 @@ class MainWindow(QMainWindow):
         self.history_manager = HistoryManager(max_records=self.settings.history_limit)
 
         self.setWindowTitle("OmniConvert — Universal File Workspace")
-        self.resize(1100, 740)
-        self.setMinimumSize(880, 580)
+        self.resize(1180, 780)
+        self.setMinimumSize(960, 640)
 
         icon_path = get_icon_path(prefer_ico=True)
         if icon_path.exists():

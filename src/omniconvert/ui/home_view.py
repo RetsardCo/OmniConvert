@@ -79,15 +79,43 @@ class DropArea(QFrame):
         if folder:
             self.files_dropped.emit([folder])
 
+    def _set_drag_active(self, active: bool):
+        if active:
+            self.setStyleSheet("""
+                QFrame#card {
+                    border: 2px solid #22c55e;
+                    border-radius: 12px;
+                    background-color: rgba(34, 197, 94, 0.08);
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#card {
+                    border: 2px dashed #3b82f6;
+                    border-radius: 12px;
+                }
+            """)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+            self._set_drag_active(True)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._set_drag_active(False)
+        event.accept()
 
     def dropEvent(self, event):
+        self._set_drag_active(False)
         urls = event.mimeData().urls()
         file_paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if file_paths:
             self.files_dropped.emit(file_paths)
+        event.acceptProposedAction()
 
 
 class HomeView(QWidget):

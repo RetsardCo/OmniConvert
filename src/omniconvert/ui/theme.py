@@ -64,12 +64,51 @@ QFrame#card {
 }
 
 /* Inputs, Combos, SpinBoxes, Lists, Tables, TextEdits */
-QLineEdit, QComboBox, QSpinBox {
+QLineEdit, QSpinBox {
     background-color: #2b2f38;
     color: #f0f2f5;
     border: 1px solid #3c424f;
     border-radius: 6px;
     padding: 5px 10px;
+    min-height: 22px;
+}
+
+QComboBox {
+    background-color: #2b2f38;
+    color: #f0f2f5;
+    border: 1px solid #3c424f;
+    border-radius: 6px;
+    padding: 5px 28px 5px 10px;
+    min-height: 22px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border-left: 1px solid #3c424f;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: #22252c;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #9ba1a6;
+    width: 0;
+    height: 0;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1f2125;
+    color: #f0f2f5;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    selection-background-color: #0066cc;
+    selection-color: #ffffff;
+    padding: 4px;
 }
 
 QComboBox#qualityPresetCombo {
@@ -167,6 +206,16 @@ QScrollBar:vertical {
     width: 8px;
     margin: 0px;
 }
+/* Tooltips */
+QToolTip {
+    background-color: #1e222b;
+    color: #f1f5f9;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
 QScrollBar::handle:vertical {
     background: #373b44;
     min-height: 20px;
@@ -240,12 +289,51 @@ QFrame#card {
 }
 
 /* Inputs, Combos, SpinBoxes, Lists, Tables, TextEdits */
-QLineEdit, QComboBox, QSpinBox {
+QLineEdit, QSpinBox {
     background-color: #ffffff;
     color: #1f2328;
     border: 1px solid #d0d7de;
     border-radius: 6px;
     padding: 5px 10px;
+    min-height: 22px;
+}
+
+QComboBox {
+    background-color: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 5px 28px 5px 10px;
+    min-height: 22px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border-left: 1px solid #d0d7de;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: #f6f8fa;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #57606a;
+    width: 0;
+    height: 0;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #1f2328;
+    border: 1px solid #0969da;
+    border-radius: 6px;
+    selection-background-color: #0969da;
+    selection-color: #ffffff;
+    padding: 4px;
 }
 
 QComboBox#qualityPresetCombo {
@@ -343,6 +431,16 @@ QScrollBar:vertical {
     width: 8px;
     margin: 0px;
 }
+/* Tooltips */
+QToolTip {
+    background-color: #ffffff;
+    color: #1f2328;
+    border: 1px solid #0969da;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
 QScrollBar::handle:vertical {
     background: #cfd5dc;
     min-height: 20px;
