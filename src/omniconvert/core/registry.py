@@ -302,6 +302,18 @@ class CapabilityRegistry:
             }
         ))
         self.register(Capability(
+            id="pdf.merge_pdfs",
+            display_name="Merge Multiple PDFs into 1 PDF",
+            description="Sequentially merge multiple PDF documents into a single consolidated PDF file.",
+            input_categories=["document"],
+            input_formats=["pdf"],
+            output_category="document",
+            output_format="pdf",
+            engine="pypdf",
+            operation="merge_pdfs",
+            lossy=False
+        ))
+        self.register(Capability(
             id="pdf.to_docx",
             display_name="Convert PDF to Word (.docx)",
             description="Reconstruct PDF layout, paragraphs, tables, and embedded images into an editable Word document.",

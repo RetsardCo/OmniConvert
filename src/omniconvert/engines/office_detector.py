@@ -59,8 +59,13 @@ class LibreOfficeDetector:
         if found:
             return Path(found)
 
+        # Check portable/bundled app engines folder
+        from omniconvert.config.paths import get_app_root
+        app_engines_dir = get_app_root() / "engines" / "libreoffice" / "program" / exe_name
+
         # Common Windows install paths
         candidate_paths = [
+            app_engines_dir,
             Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "LibreOffice" / "program" / exe_name,
             Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "LibreOffice" / "program" / exe_name,
             Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "LibreOffice" / "program" / exe_name,

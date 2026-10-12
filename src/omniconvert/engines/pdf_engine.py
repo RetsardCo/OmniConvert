@@ -45,7 +45,13 @@ class PDFEngine(BaseEngine):
         settings = job.settings or {}
         op = job.operation_id
 
-        # 0. Batch Images to Multi-Page PDF
+        # 0. Batch Operations: Images to PDF or Multi-PDF Merge
+        if op == "pdf.merge_pdfs" or settings.get("batch_pdf_paths"):
+            raw_paths = settings.get("batch_pdf_paths", [])
+            paths = [Path(p) for p in raw_paths] if raw_paths else [source]
+            target_name = settings.get("output_filename", f"{source.stem}_merged.pdf")
+            return self.merge_pdfs(paths, workspace_dir / target_name, settings, progress_callback, is_cancelled)
+
         if op == "image.batch_to_pdf" or settings.get("batch_image_paths"):
             raw_paths = settings.get("batch_image_paths", [])
             paths = [Path(p) for p in raw_paths] if raw_paths else [source]
@@ -551,4 +557,61 @@ class PDFEngine(BaseEngine):
         finally:
             for im in converted_images:
                 im.close()
+
+    def merge_pdfs(
+        self,
+        pdf_paths: List[Path],
+        output_path: Path,
+        settings: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[JobProgress], None]] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None
+    ) -> Path:
+        """Merge multiple PDF documents sequentially into a single consolidated PDF."""
+        if not pdf_paths:
+            raise ValueError("No PDF files provided to merge.")
+
+        total_files = len(pdf_paths)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        writer = pypdf.PdfWriter()
+
+        try:
+            for idx, p in enumerate(pdf_paths):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("Cancelled during PDF merge.")
+
+                if progress_callback:
+                    progress_callback(JobProgress(
+                        percentage=int((idx / max(1, total_files)) * 85),
+                        stage="Merging PDFs",
+                        detail=f"Appending file {idx + 1}/{total_files}: {p.name}"
+                    ))
+
+                if not p.exists() or p.stat().st_size == 0:
+                    continue
+
+                writer.append(str(p))
+
+            if is_cancelled and is_cancelled():
+                raise InterruptedError("Cancelled before saving merged PDF.")
+
+            if progress_callback:
+                progress_callback(JobProgress(
+                    percentage=90.0,
+                    stage="Saving Merged PDF",
+                    detail=f"Writing combined output to {output_path.name}"
+                ))
+
+            with open(output_path, "wb") as f_out:
+                writer.write(f_out)
+
+            if progress_callback:
+                progress_callback(JobProgress(
+                    percentage=100.0,
+                    stage="Complete",
+                    detail=f"Successfully merged {total_files} PDF files into 1 PDF"
+                ))
+
+            return output_path
+        finally:
+            writer.close()
 

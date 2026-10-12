@@ -151,3 +151,33 @@ def test_queue_view_clear_buttons(tmp_path: Path):
     assert len(queue_view.cards) == 0
     assert not queue_view.empty_lbl.isHidden()
 
+
+def test_batch_merge_pdfs(tmp_path: Path):
+    from omniconvert.engines.pdf_engine import PDFEngine
+    import pypdf
+
+    # Create 2 simple valid PDFs
+    pdf1 = tmp_path / "doc1.pdf"
+    pdf2 = tmp_path / "doc2.pdf"
+
+    writer1 = pypdf.PdfWriter()
+    writer1.add_blank_page(width=200, height=200)
+    with open(pdf1, "wb") as f:
+        writer1.write(f)
+
+    writer2 = pypdf.PdfWriter()
+    writer2.add_blank_page(width=200, height=200)
+    writer2.add_blank_page(width=200, height=200)
+    with open(pdf2, "wb") as f:
+        writer2.write(f)
+
+    engine = PDFEngine()
+    out_merged = tmp_path / "final_merged.pdf"
+    res = engine.merge_pdfs([pdf1, pdf2], out_merged)
+
+    assert res.exists()
+    reader = pypdf.PdfReader(str(res))
+    # 1 page from doc1 + 2 pages from doc2 = 3 pages
+    assert len(reader.pages) == 3
+
+

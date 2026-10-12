@@ -104,29 +104,41 @@ class ConversionWorkspaceView(QWidget):
         file_btns.addWidget(self.clear_all_btn)
         left_layout.addLayout(file_btns)
 
-        # Batch image tools box
+        # Batch tools box
         batch_card = QFrame()
         batch_card.setStyleSheet("background: #181d28; border: 1px solid #2b3548; border-radius: 6px;")
         batch_vbox = QVBoxLayout(batch_card)
         batch_vbox.setContentsMargins(10, 8, 10, 8)
         batch_vbox.setSpacing(6)
 
-        batch_title = QLabel("📦 Batch Image Operations")
+        batch_title = QLabel("📦 Batch & Merge Tools")
         batch_title.setStyleSheet("font-weight: 600; font-size: 12px; color: #60a5fa;")
         batch_vbox.addWidget(batch_title)
 
-        batch_row = QHBoxLayout()
-        self.combine_pdf_btn = QPushButton("📑 Merge to 1 PDF")
-        self.combine_pdf_btn.setToolTip("Combine loaded/selected images into 1 multi-page PDF document")
-        self.combine_pdf_btn.clicked.connect(self._combine_images_to_pdf)
+        batch_row1 = QHBoxLayout()
+        self.merge_pdfs_btn = QPushButton("📄 Merge PDFs (1 PDF)")
+        self.merge_pdfs_btn.setToolTip("Merge all loaded or highlighted PDF files into 1 consolidated PDF document")
+        self.merge_pdfs_btn.clicked.connect(self._merge_loaded_pdfs)
 
-        self.combine_gif_btn = QPushButton("🎞️ Merge to 1 GIF")
-        self.combine_gif_btn.setToolTip("Combine loaded/selected images into 1 animated GIF")
+        self.combine_pdf_btn = QPushButton("📑 Images ➔ 1 PDF")
+        self.combine_pdf_btn.setToolTip("Combine loaded or highlighted image files into 1 multi-page PDF document")
+        self.combine_pdf_btn.clicked.connect(self._combine_images_to_pdf)
+        batch_row1.addWidget(self.merge_pdfs_btn)
+        batch_row1.addWidget(self.combine_pdf_btn)
+        batch_vbox.addLayout(batch_row1)
+
+        batch_row2 = QHBoxLayout()
+        self.combine_gif_btn = QPushButton("🎞️ Images ➔ 1 GIF")
+        self.combine_gif_btn.setToolTip("Combine loaded or highlighted image files into 1 animated GIF")
         self.combine_gif_btn.clicked.connect(self._combine_images_to_gif)
 
-        batch_row.addWidget(self.combine_pdf_btn)
-        batch_row.addWidget(self.combine_gif_btn)
-        batch_vbox.addLayout(batch_row)
+        self.batch_zip_btn = QPushButton("🗜️ Archive All (.zip)")
+        self.batch_zip_btn.setToolTip("Package all loaded or highlighted files into a compressed ZIP archive")
+        self.batch_zip_btn.clicked.connect(self._package_loaded_to_zip)
+        batch_row2.addWidget(self.combine_gif_btn)
+        batch_row2.addWidget(self.batch_zip_btn)
+        batch_vbox.addLayout(batch_row2)
+
         left_layout.addWidget(batch_card)
 
         splitter.addWidget(left_card)
@@ -371,6 +383,69 @@ class ConversionWorkspaceView(QWidget):
             if m.category == "image" or m.detected_format.lower() in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "heic", "heif", "gif")
         ]
         return image_paths
+
+    def _get_target_pdf_paths(self) -> List[Path]:
+        """Collect PDF files from user selection or all loaded files."""
+        selected_rows = sorted(list(set(idx.row() for idx in self.file_list.selectedIndexes())))
+        if len(selected_rows) > 1:
+            candidate_metas = [self.files_meta[i] for i in selected_rows if 0 <= i < len(self.files_meta)]
+        else:
+            candidate_metas = self.files_meta
+
+        pdf_paths = [
+            m.path for m in candidate_metas
+            if m.detected_format.lower() == "pdf" and m.is_readable and not m.is_empty
+        ]
+        return pdf_paths
+
+    def _merge_loaded_pdfs(self):
+        """Merge all candidate PDF files into a single consolidated PDF."""
+        pdfs = self._get_target_pdf_paths()
+        if len(pdfs) < 2:
+            self.notice_label.setText("⚠️ Please select or load at least 2 PDF documents to merge into a single PDF.")
+            return
+
+        dest_dir = self._get_destination_dir() or pdfs[0].parent
+        settings = self.collect_current_settings()
+        settings["batch_pdf_paths"] = [str(p) for p in pdfs]
+        settings["output_filename"] = f"{pdfs[0].stem}_merged.pdf"
+
+        self.job_requested.emit({
+            "source_path": pdfs[0],
+            "target_format": "pdf",
+            "operation_id": "pdf.merge_pdfs",
+            "engine": "pypdf",
+            "settings": settings,
+            "destination_path": dest_dir
+        })
+        self.notice_label.setText(f"Enqueued merge of {len(pdfs)} PDF files into 1 PDF.")
+
+    def _package_loaded_to_zip(self):
+        """Compress all selected or loaded workspace files into a ZIP archive."""
+        selected_rows = sorted(list(set(idx.row() for idx in self.file_list.selectedIndexes())))
+        if len(selected_rows) > 0:
+            candidates = [self.files_meta[i] for i in selected_rows if 0 <= i < len(self.files_meta)]
+        else:
+            candidates = self.files_meta
+
+        valid_paths = [m.path for m in candidates if m.is_readable and not m.is_empty]
+        if not valid_paths:
+            self.notice_label.setText("⚠️ No valid files available to archive.")
+            return
+
+        dest_dir = self._get_destination_dir() or valid_paths[0].parent
+        first_p = valid_paths[0]
+        parent_dir = first_p if first_p.is_dir() else first_p.parent
+
+        self.job_requested.emit({
+            "source_path": parent_dir,
+            "target_format": "zip",
+            "operation_id": "archive.to_zip",
+            "engine": "archive",
+            "settings": {"compresslevel": 6},
+            "destination_path": dest_dir
+        })
+        self.notice_label.setText(f"Enqueued ZIP compression for {len(valid_paths)} item(s).")
 
     def _combine_images_to_pdf(self):
         """Combine images into a single multi-page PDF."""
