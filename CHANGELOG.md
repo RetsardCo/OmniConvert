@@ -1,60 +1,60 @@
 # Changelog
 
 All notable changes to **OmniConvert** are documented in this file.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] - 2026-10-12 (Pre-Release Development Build)
+## [0.1.0-alpha] - 2026-10-12
 
-### Added
-- **Multi-Tier Distribution & Release Pipeline (5 Release Packages in `dist/releases/`)**:
-  - `OmniConvert-Portable-Lite.zip`: Core standalone application (~110 MB) supporting 70+ formats with zero AI weights.
-  - `OmniConvert-Portable-OCR.zip`: Core application with pre-bundled portable Tesseract OCR engine in `bin/tesseract/`.
-  - `OmniConvert-Portable-Whisper.zip`: Core application with pre-bundled faster-whisper CTranslate2 model in `resources/models/whisper/`.
-  - `OmniConvert-Portable-Full.zip`: Zero-download "Swiss Army Knife" featuring both pre-bundled OCR and Whisper speech-to-text models.
-  - `OmniConvert-Setup.exe`: Inno Setup 6 smart installer with component checkboxes for custom installation.
-- **UI / UX Polish & Accessibility**:
-  - Full hover detail tooltips displaying untruncated text across the Format Explorer, Conversion Workspace, and History views.
-  - Responsive layout scaling when maximized, with clean expansion of settings panels and options.
-  - Custom combobox padding (`28px`) preventing drop-down arrows from overlapping long operation names.
-  - User confirmation dialogs on clearing active files or cancelling jobs.
-  - Individual file removal button (`Remove Selected`) and keyboard shortcuts (`Delete`, `Backspace`).
-- **Batch & Merge Operations**:
-  - PDF Merger: Merge multiple PDF documents into a unified output PDF (`pypdf.PdfWriter`).
-  - Batch Images to PDF: Multi-page document generation from arbitrary image collections.
-  - Batch Images to Animated GIF: Multi-frame sequence merging with frame duration controls.
-  - Dedicated "📦 Batch & Merge Tools" workspace grid for 1-click workflow dispatch.
-- **Optical Disc & iOS Modern Format Support**:
-  - ISO 9660 & Joliet Optical Disc filesystem inspection, extraction, and directory creation (`pycdlib`).
-  - Windows native disc burner integration (`isoburn.exe`).
-  - Apple iOS `.heic` / `.heif` high-efficiency images with lossless conversion (`pillow-heif`).
-  - Apple iOS `.hevc` / H.265 video stream remuxing and transcoding.
-- **Pre-Bundled Engine & Model Path Discovery**:
-  - Added portable `bin/tesseract/` binary detection in `TesseractDetector` with automatic `TESSDATA_PREFIX` configuration.
-  - Added offline `resources/models/whisper/` detection in `SpeechDetector` and `ASREngine`.
-  - Added portable LibreOffice search path support in `LibreOfficeDetector`.
+> **First public pre-release.** All core features are functional. Expect rough
+> edges — please [file issues](https://github.com/RetsardCo/OmniConvert/issues)
+> if you encounter bugs.
 
-## [1.0.0] - 2026-10-11
+### 🎉 Highlights
+- 70+ file format conversions across documents, images, audio, video, archives, and data — **100% offline, zero cloud**.
+- 5 distribution packages: Lite, +OCR, +Whisper, Full, and Windows Installer.
+- Qt 6 desktop GUI with drag-and-drop, batch & merge tools, quality presets, and conversion history.
 
-### Added
-- **Application Branding & Icons**:
-  - Generated high-resolution rounded-squircle RGBA application icon (`src/omniconvert/resources/icon.png`) and multi-resolution Windows `.ico` (`16x16` through `256x256` at `src/omniconvert/resources/icon.ico`).
-  - Integrated taskbar/window icons across `QApplication` (`SetCurrentProcessExplicitAppUserModelID`), `MainWindow`, `HomeView`, and PyInstaller packaging script.
-- **Full Document & Office Suite (Offline)**:
-  - **PDF to Word (`.pdf` -> `.docx`)** via `pdf2docx`, `PyMuPDF` (`fitz`), and `python-docx` with layout, table, paragraph, and image preservation.
-  - **Word to PDF (`.docx` -> `.pdf`)** and bidirectional conversions between `.docx`, `.xlsx`, `.pptx`, `.pdf`, `.txt`, `.html`, `.md`, `.csv`, and `.json` working 100% offline via pure-Python engines (`reportlab`, `python-docx`, `openpyxl`, `python-pptx`, `markdown`) or LibreOffice when installed.
-  - **PDF to High-DPI Images (`.png`, `.jpeg`)**, **PDF to HTML**, and **PDF to Markdown** via `PyMuPDF`.
-- **Quality & Detail Level Controls**:
-  - Added global Quality / Detail Level selector (`Lossless / Exact Quality (100%)`, `High Quality`, `Balanced`, `Compact`, `Custom`) in the Conversion Workspace alongside per-operation parameter schemas.
-  - Added `quality=100, subsampling=0 (4:4:4)` lossless-chroma JPEG encoding and `lossless=True` WebP encoding.
-- **Comprehensive Audio & Video Support**:
-  - Full audio conversions across `mp3`, `wav` (16/24/32-bit PCM), `flac`, `aac`, `m4a` (AAC and Apple Lossless ALAC), `ogg` (Vorbis quality scale), `opus`, and `aiff` with bitrate, sample rate, and channel controls.
-  - Video transcoding (`mp4`, `mkv`, `webm`, `mov`, `avi`, `gif`), audio extraction, subtitle extraction, FFprobe metadata-to-JSON, and `data.csv_to_mp4` animated bar-chart video generation.
-- **Phase 8 — Archives & Compression (`ArchiveEngine`)**:
-  - Added `zip`, `tar`, `tar.gz`/`tgz`, `gz`, and `7z` (`py7zr`) listing, extraction, creation, and cross-format repacking with strict Zip-Slip path traversal protection, symlink blocking, and decompression bomb limits.
-- **Phase 9 — Cross-Category Workflow Planner (`WorkflowPlanner` & `WorkflowEngine`)**:
-  - Added bounded shortest-path BFS workflow discovery across registered single-step capabilities (e.g., `docx -> txt -> wav`, `mp4 -> wav -> flac`, `png -> txt -> wav`) plus `workflow.archive_to_pdf`.
-  - Added per-step intermediate output validation and `WorkflowStepError` reporting.
-- **Phase 10 — Local TTS, OCR, ASR & Static Binary Inspection**:
-  - Added offline Text-to-Speech (`TTSEngine` via Windows SAPI5 / `pyttsx3` with deterministic PCM WAV fallback), optional local Tesseract OCR (`OCREngine`), optional local Whisper ASR (`ASREngine`), and static binary inspection (`BinaryEngine` for strings, hashes, Shannon entropy, PE headers, and hex dumps).
-- **Phase 11–14 — UI Completion, History, Packaging & Verification**:
-  - Completed `ConversionWorkspaceView`, `QueueView` (`Open Folder` and `Retry` buttons), persistent `HistoryView`, searchable `FormatExplorerView`, and `SettingsView` with live local dependency & privacy reporting.
-  - Added `scripts/check_dependencies.py` and `scripts/build_windows.py` for Windows PyInstaller packaging.
+### Added — Core Engines
+- **Document & Office Suite**: PDF ↔ Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), HTML, Markdown, CSV, JSON, TXT — fully offline via pure-Python engines (`reportlab`, `python-docx`, `openpyxl`, `python-pptx`, `pdf2docx`, `PyMuPDF`) or optional LibreOffice headless.
+- **PDF Toolkit**: PDF → high-DPI images (PNG/JPEG), PDF → HTML, PDF → Markdown, PDF merge, images → PDF.
+- **Image Processing**: PNG, JPEG, BMP, TIFF, WebP, GIF, ICO, SVG, and Apple HEIC/HEIF (`pillow-heif`). Quality presets from lossless (4:4:4 chroma, quality 100) through compact.
+- **Audio Transcoding**: MP3, WAV (16/24/32-bit PCM), FLAC, AAC, M4A (AAC + ALAC), OGG Vorbis, Opus, AIFF — with bitrate, sample rate, and channel controls via FFmpeg.
+- **Video Transcoding**: MP4, MKV, WebM, MOV, AVI, animated GIF. Audio extraction, subtitle extraction, FFprobe metadata → JSON, CSV → animated bar-chart video.
+- **Archives & Compression**: ZIP, TAR, TAR.GZ/TGZ, GZ, 7Z — list, extract, create, and cross-format repack with Zip-Slip protection, symlink blocking, and decompression-bomb limits.
+- **ISO / Optical Disc**: ISO 9660 & Joliet inspection, extraction, and directory creation (`pycdlib`); Windows `isoburn.exe` integration.
+- **Cross-Category Workflow Planner**: Bounded shortest-path BFS across all registered single-step capabilities (e.g., `docx → txt → wav`).
+
+### Added — Optional AI Engines (bundled in OCR / Whisper / Full packages)
+- **Tesseract OCR** (`OCREngine`): Image-to-text via portable Tesseract 5.4 binaries with auto `TESSDATA_PREFIX` configuration.
+- **Whisper ASR** (`ASREngine`): Audio-to-text via faster-whisper (CTranslate2 `tiny.en` model). Includes PyAV 19.x compatibility patch.
+- **TTS** (`TTSEngine`): Offline text-to-speech via Windows SAPI5 / `pyttsx3` with deterministic PCM WAV fallback.
+- **Binary Inspector** (`BinaryEngine`): Strings extraction, SHA-256 hashes, Shannon entropy, PE header parsing, and hex dumps.
+
+### Added — UI & UX
+- Qt 6 (`PySide6`) main window with sidebar navigation: Home, Conversion Workspace, Batch & Merge, Queue, History, Format Explorer, Settings.
+- Drag-and-drop file input with multi-file selection.
+- Global quality / detail level selector (Lossless, High, Balanced, Compact, Custom) with per-operation parameter schemas.
+- Full hover-detail tooltips displaying untruncated text across all views.
+- Responsive layout scaling for windowed and maximized modes.
+- Confirmation dialogs on clearing files or cancelling jobs.
+- `Remove Selected` button and keyboard shortcuts (`Delete` / `Backspace`).
+- Persistent conversion history with search and "Open Folder" / "Retry" actions.
+- Searchable Format Explorer showing all supported conversions.
+- Settings view with live local-dependency and privacy reporting.
+
+### Added — Batch & Merge
+- **PDF Merge**: Combine multiple PDFs into one (`pypdf.PdfWriter`).
+- **Images → PDF**: Multi-page document generation from image collections.
+- **Images → Animated GIF**: Multi-frame GIF with configurable frame duration.
+- Dedicated "📦 Batch & Merge Tools" workspace grid.
+
+### Added — Distribution & Packaging
+- `scripts/prepare_engines.py` — stages Tesseract binaries and Whisper model weights.
+- `scripts/build_releases.py` — master automation: PyInstaller → 4 portable ZIPs → Inno Setup installer.
+- `scripts/installer.iss` — Inno Setup 6 script with optional OCR and Whisper components.
+- Multi-resolution Windows `.ico` (16×16 → 256×256) and PNG application icon.
+- PyInstaller `--onedir` packaging with `--windowed --icon` flags.
+
+### Added — Quality & Testing
+- 78 unit tests across 12 test modules — all passing.
+- `scripts/check_dependencies.py` for build-time dependency verification.
