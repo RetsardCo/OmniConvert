@@ -16,6 +16,23 @@ from omniconvert.core.safe_subprocess import SafeSubprocessRunner
 logger = logging.getLogger(__name__)
 
 
+def _patch_pyav_metadata_errors():
+    """Fix compatibility between faster-whisper and PyAV 14+ where metadata_errors was removed from av.open."""
+    try:
+        import av
+        if hasattr(av, "open") and not getattr(av.open, "_is_patched_for_metadata_errors", False):
+            orig_open = av.open
+            def _safe_av_open(*args, **kwargs):
+                kwargs.pop("metadata_errors", None)
+                return orig_open(*args, **kwargs)
+            _safe_av_open._is_patched_for_metadata_errors = True
+            av.open = _safe_av_open
+    except Exception:
+        pass
+
+_patch_pyav_metadata_errors()
+
+
 @dataclass
 class SpeechEngineInfo:
     tts_available: bool = False
@@ -203,6 +220,7 @@ class ASREngine(BaseEngine):
         else:
             model_to_load = model_size
 
+        _patch_pyav_metadata_errors()
         model = faster_whisper.WhisperModel(model_to_load, device="cpu", compute_type="int8", local_files_only=True)
         segments, _ = model.transcribe(str(source))
         lines = []
