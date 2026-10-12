@@ -11,6 +11,9 @@ __pycache__/
 # Distribution & Packaging
 build/
 dist/
+bin/
+resources/models/
+staging*/
 *.egg-info/
 
 # PyTest & Coverage

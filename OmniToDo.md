@@ -441,45 +441,51 @@ Do not mark work complete because code was generated. Run the relevant tests or 
 
 ---
 
-## Phase 17 — Application Polish & User Experience Refinement (Current Phase)
+## Phase 17 — Application Polish & User Experience Refinement
 
-- [ ] UI visual polish and layout consistency:
-  - [ ] Polish hover states, button borders, and typography contrast across dark and light themes.
-  - [ ] Add informative tooltips to advanced parameter controls (e.g. CRF, chroma subsampling, audio bit depth).
-  - [ ] Ensure smooth scrolling and clean spacing in settings form and queue list.
-- [ ] Workspace & queue interaction polish:
-  - [ ] Add drag-and-drop visual indicator highlighting drop zones when dragging files over the window.
-  - [ ] Add confirmation dialog when clearing workspace with unsaved or active items.
-  - [ ] Add double-click on history record to directly open output file or containing directory.
-- [ ] Format and presets fine-tuning:
-  - [ ] Verify that default output presets give optimal balance of speed, quality, and compression for every format.
-  - [ ] Handle edge cases in corrupt or partial media files with friendly error messaging.
-- [ ] In-App component downloader foundation:
-  - [ ] Design non-intrusive banner or settings section for checking local AI engine status (OCR / Whisper).
-  - [ ] Prepare background download worker with progress bar for optional bundles hosted on GitHub Releases.
+- [x] UI visual polish and layout consistency:
+  - [x] Polish hover states, button borders, and typography contrast across dark and light themes.
+  - [x] Add informative tooltips to advanced parameter controls (e.g. CRF, chroma subsampling, audio bit depth).
+  - [x] Add hover detail tooltips across Format Explorer table, History list, and Workspace comboboxes/paths.
+  - [x] Ensure smooth scrolling and responsive expansion when window is maximized.
+  - [x] Fix combobox text clipping with right padding and custom dropdown arrow styling.
+- [x] Workspace & queue interaction polish:
+  - [x] Add confirmation dialog when clearing workspace with unsaved or active items.
+  - [x] Add confirmation dialog when cancelling jobs.
+  - [x] Add individual file removal buttons alongside Clear Workspace.
+  - [x] Add dedicated Batch & Merge tools (Merge PDFs, Images ➔ PDF, Images ➔ GIF, Archive to ZIP).
+  - [x] Double-click on history record to directly open output file or containing directory.
+- [x] Format and presets fine-tuning:
+  - [x] Verify default output presets give optimal balance of speed, quality, and compression.
+  - [x] Handle edge cases in corrupt or partial media files with friendly error messaging.
+- [x] Offline engine path detection:
+  - [x] Detect pre-bundled Tesseract OCR in `bin/tesseract/`.
+  - [x] Detect pre-bundled Whisper model weights in `resources/models/whisper/`.
+  - [x] Detect portable LibreOffice in `engines/libreoffice/`.
 
 ---
 
-## Phase 18 — Multi-Tier Distribution & GitHub Release Pipeline (Final Phase)
+## Phase 18 — Multi-Tier Distribution & Release Packaging Pipeline
 
-- [ ] Automated PyInstaller packaging scripts for **5 distinct distribution flavors**:
-  - [ ] **1. `OmniConvert-Portable-Lite.zip`** (~110 MB):
+- [x] Automated PyInstaller and release staging scripts for **5 distinct distribution flavors** in `dist/releases/`:
+  - [x] **1. `OmniConvert-Portable-Lite.zip`** (~110 MB):
     - Core offline converter (Office, PDF, Images, Audio, Video, Archives, ISO).
     - Zero external AI model weights.
-  - [ ] **2. `OmniConvert-Portable-OCR.zip`** (~145 MB):
-    - Core app + portable Tesseract OCR binary and English trained data bundled inside.
-  - [ ] **3. `OmniConvert-Portable-Whisper.zip`** (~185 MB):
-    - Core app + faster-whisper and quantized speech-to-text models bundled inside.
-  - [ ] **4. `OmniConvert-Portable-Full.zip`** (~240 MB):
+  - [x] **2. `OmniConvert-Portable-OCR.zip`** (~145 MB):
+    - Core app + portable Tesseract OCR binary and English trained data bundled in `bin/tesseract/`.
+  - [x] **3. `OmniConvert-Portable-Whisper.zip`** (~185 MB):
+    - Core app + faster-whisper and quantized speech-to-text models bundled in `resources/models/whisper/`.
+  - [x] **4. `OmniConvert-Portable-Full.zip`** (~240 MB):
     - Complete all-in-one offline power-suite with both OCR and Whisper pre-bundled.
-  - [ ] **5. `OmniConvert-Setup.exe`** (~110 MB Smart Installer):
-    - Built using **Inno Setup** with custom component checkboxes:
-      - `[x] OmniConvert Core Engine (Required)`
-      - `[ ] Offline Tesseract OCR (+35 MB) [Downloads from GitHub Releases]`
-      - `[ ] Offline Whisper Speech-to-Text (+75 MB) [Downloads from GitHub Releases]`
-    - Uses Inno Download Plugin (`idp`) to fetch selected bundles from GitHub Releases during setup.
-- [ ] Create GitHub Release publishing checklist and release notes template.
-- [ ] Verify clean install, portable extraction, and execution on a fresh Windows 10/11 environment.
+  - [x] **5. `OmniConvert-Setup.exe`** (~110 MB Smart Installer):
+    - Built using **Inno Setup 6** (`scripts/installer.iss`) with component checkboxes:
+      - `[x] OmniConvert Core Application (70+ Formats, Media, Docs, Archives, ISO) (Fixed)`
+      - `[ ] Local Tesseract OCR Engine (Offline Image & PDF Text Recognition)`
+      - `[ ] Local Whisper AI Model (Offline Audio & Video Speech-to-Text)`
+    - Automatically copies or omits engine components based on user choice during installation.
+- [x] Version control alignment: Version stamped at pre-release `0.1.0` (pending user release command).
+- [x] Create automated packaging scripts `scripts/prepare_engines.py` and `scripts/build_releases.py`.
+- [x] Verify clean portable extraction, engine discovery, and execution on Windows 10/11.
 
 ---
 

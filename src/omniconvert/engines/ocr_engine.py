@@ -42,12 +42,15 @@ class TesseractDetector:
             return info
 
         info.tesseract_path = tess_bin
-        res = self._runner.run([str(tess_bin), "--version"], timeout=5.0)
+        tessdata_dir = tess_bin.parent / "tessdata"
+        env = {"TESSDATA_PREFIX": str(tessdata_dir)} if tessdata_dir.exists() else None
+
+        res = self._runner.run([str(tess_bin), "--version"], timeout=5.0, env=env)
         if res.returncode == 0:
             first_line = (res.stdout or res.stderr).splitlines()
             info.version = first_line[0].strip() if first_line else "unknown"
 
-        res_langs = self._runner.run([str(tess_bin), "--list-langs"], timeout=5.0)
+        res_langs = self._runner.run([str(tess_bin), "--list-langs"], timeout=5.0, env=env)
         if res_langs.returncode == 0:
             langs = []
             for line in (res_langs.stdout or "").splitlines():
@@ -132,7 +135,10 @@ class OCREngine(BaseEngine):
             str(out_base),
             "-l", lang
         ]
-        res = self._runner.run(args, timeout=120.0, is_cancelled=is_cancelled)
+        tessdata_dir = self.info.tesseract_path.parent / "tessdata" if self.info.tesseract_path else None
+        env = {"TESSDATA_PREFIX": str(tessdata_dir)} if (tessdata_dir and tessdata_dir.exists()) else None
+
+        res = self._runner.run(args, timeout=120.0, is_cancelled=is_cancelled, env=env)
         if res.cancelled or (is_cancelled and is_cancelled()):
             raise InterruptedError("OCR job cancelled.")
         if res.timed_out:

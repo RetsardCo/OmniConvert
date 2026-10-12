@@ -3,7 +3,8 @@
 import subprocess
 import time
 import logging
-from typing import List, Optional, Tuple, Callable
+import os
+from typing import List, Optional, Tuple, Callable, Dict
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,8 @@ class SafeSubprocessRunner:
         args: List[str],
         timeout: Optional[float] = 300.0,
         cwd: Optional[str] = None,
-        is_cancelled: Optional[Callable[[], bool]] = None
+        is_cancelled: Optional[Callable[[], bool]] = None,
+        env: Optional[Dict[str, str]] = None
     ) -> SubprocessResult:
         """
         Execute command with argument array (never shell=True).
@@ -48,6 +50,11 @@ class SafeSubprocessRunner:
             except AttributeError:
                 pass
 
+            process_env = None
+            if env is not None:
+                process_env = os.environ.copy()
+                process_env.update(env)
+
             self._current_process = subprocess.Popen(
                 args,
                 stdout=subprocess.PIPE,
@@ -56,6 +63,7 @@ class SafeSubprocessRunner:
                 encoding="utf-8",
                 errors="replace",
                 cwd=cwd,
+                env=process_env,
                 creationflags=creationflags
             )
 

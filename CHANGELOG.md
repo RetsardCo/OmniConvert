@@ -2,29 +2,35 @@
 
 All notable changes to **OmniConvert** are documented in this file.
 
-## [Unreleased] - Phase 17 & Phase 18
-### Planned
-- **Phase 17 — Application Polish & UX Refinement**:
-  - Refined Qt styling, visual drag-and-drop hover feedback, and enhanced tooltips for quality presets (Lossless, High, Balanced, Compact).
-  - Double-click to open converted files in History.
-  - Confirmation dialogs for clearing active queues and workspace files.
-- **Phase 18 — Multi-Tier Distribution & Smart Installer**:
-  - Inno Setup installer (`OmniConvert-Setup.exe`) with on-demand component selection (OCR & Whisper).
-  - 4 portable editions hosted on GitHub Releases (`Lite`, `OCR`, `Whisper`, `Full`).
+## [0.1.0] - 2026-10-12 (Pre-Release Development Build)
 
-## [1.1.0] - 2026-10-12
 ### Added
-- **ISO 9660 & Joliet Optical Disc Engine (`pycdlib`)**:
-  - Full support for `.iso` image files: inspect volume descriptors, safely extract archive/disc contents, create ISO 9660 / Joliet filesystem images from directories, and cross-repack between `.iso` and `.zip`/`.7z`/`.tar`.
-  - Added native Windows optical disc burner launch integration (`isoburn.exe`).
-- **Apple iOS HEIC & HEVC Integration**:
-  - Added `.heic` / `.heif` high-efficiency image support with lossless conversion via `pillow-heif`.
-  - Added `.hevc` / H.265 video stream remuxing and transcoding via FFmpeg.
-- **Batch Image Tools & Extended Workspace Controls**:
-  - Added batch multi-image to single multi-page PDF (`image.batch_to_pdf`).
-  - Added batch multi-image to animated GIF (`image.batch_to_gif`).
-  - Added granular "Remove Selected" button and keyboard shortcuts (`Delete`, `Backspace`) in the Conversion Workspace.
-  - Added "Clear All" and "Clear Finished" queue actions in the Job Queue.
+- **Multi-Tier Distribution & Release Pipeline (5 Release Packages in `dist/releases/`)**:
+  - `OmniConvert-Portable-Lite.zip`: Core standalone application (~110 MB) supporting 70+ formats with zero AI weights.
+  - `OmniConvert-Portable-OCR.zip`: Core application with pre-bundled portable Tesseract OCR engine in `bin/tesseract/`.
+  - `OmniConvert-Portable-Whisper.zip`: Core application with pre-bundled faster-whisper CTranslate2 model in `resources/models/whisper/`.
+  - `OmniConvert-Portable-Full.zip`: Zero-download "Swiss Army Knife" featuring both pre-bundled OCR and Whisper speech-to-text models.
+  - `OmniConvert-Setup.exe`: Inno Setup 6 smart installer with component checkboxes for custom installation.
+- **UI / UX Polish & Accessibility**:
+  - Full hover detail tooltips displaying untruncated text across the Format Explorer, Conversion Workspace, and History views.
+  - Responsive layout scaling when maximized, with clean expansion of settings panels and options.
+  - Custom combobox padding (`28px`) preventing drop-down arrows from overlapping long operation names.
+  - User confirmation dialogs on clearing active files or cancelling jobs.
+  - Individual file removal button (`Remove Selected`) and keyboard shortcuts (`Delete`, `Backspace`).
+- **Batch & Merge Operations**:
+  - PDF Merger: Merge multiple PDF documents into a unified output PDF (`pypdf.PdfWriter`).
+  - Batch Images to PDF: Multi-page document generation from arbitrary image collections.
+  - Batch Images to Animated GIF: Multi-frame sequence merging with frame duration controls.
+  - Dedicated "📦 Batch & Merge Tools" workspace grid for 1-click workflow dispatch.
+- **Optical Disc & iOS Modern Format Support**:
+  - ISO 9660 & Joliet Optical Disc filesystem inspection, extraction, and directory creation (`pycdlib`).
+  - Windows native disc burner integration (`isoburn.exe`).
+  - Apple iOS `.heic` / `.heif` high-efficiency images with lossless conversion (`pillow-heif`).
+  - Apple iOS `.hevc` / H.265 video stream remuxing and transcoding.
+- **Pre-Bundled Engine & Model Path Discovery**:
+  - Added portable `bin/tesseract/` binary detection in `TesseractDetector` with automatic `TESSDATA_PREFIX` configuration.
+  - Added offline `resources/models/whisper/` detection in `SpeechDetector` and `ASREngine`.
+  - Added portable LibreOffice search path support in `LibreOfficeDetector`.
 
 ## [1.0.0] - 2026-10-11
 
