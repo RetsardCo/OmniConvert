@@ -38,9 +38,15 @@ class SpeechDetector:
         info.tts_available = True
 
         # Optional local ASR (faster_whisper or whisper)
+        from omniconvert.config.paths import get_app_root
+        bundled_model_dir = get_app_root() / "resources" / "models" / "whisper"
+        has_bundled_model = bundled_model_dir.exists() and any(bundled_model_dir.iterdir())
+
         try:
             import faster_whisper  # type: ignore
             info.asr_available = True
+            if has_bundled_model:
+                info.asr_engine_name = "faster-whisper (Pre-Bundled Offline Model in resources/models/)"
         except ImportError:
             try:
                 import whisper  # type: ignore
@@ -50,7 +56,7 @@ class SpeechDetector:
                 info.asr_available = False
                 info.error_message = (
                     "Optional local speech-recognition package (faster-whisper) is not installed.\n"
-                    "Install `pip install faster-whisper` and download a local model to enable offline audio transcription."
+                    "Install `pip install faster-whisper` or use OmniConvert-Portable-Whisper to enable offline audio transcription."
                 )
 
         return info
@@ -187,7 +193,17 @@ class ASREngine(BaseEngine):
             progress_callback(JobProgress(percentage=20.0, stage="Transcribing Audio", detail=f"Model: {model_size} (Local)"))
 
         import faster_whisper  # type: ignore
-        model = faster_whisper.WhisperModel(model_size, device="cpu", compute_type="int8", local_files_only=True)
+        from omniconvert.config.paths import get_app_root
+        bundled_model_dir = get_app_root() / "resources" / "models" / "whisper"
+
+        if bundled_model_dir.exists() and any(bundled_model_dir.iterdir()):
+            model_to_load = str(bundled_model_dir)
+        elif self.model_dir and self.model_dir.exists():
+            model_to_load = str(self.model_dir)
+        else:
+            model_to_load = model_size
+
+        model = faster_whisper.WhisperModel(model_to_load, device="cpu", compute_type="int8", local_files_only=True)
         segments, _ = model.transcribe(str(source))
         lines = []
         for seg in segments:

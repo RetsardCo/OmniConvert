@@ -71,7 +71,12 @@ class TesseractDetector:
         if found:
             return Path(found)
 
+        # Check local bundled app bin/tesseract folder
+        from omniconvert.config.paths import get_app_root
+        bundled_tess = get_app_root() / "bin" / "tesseract" / exe_name
+
         candidates = [
+            bundled_tess,
             Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Tesseract-OCR" / exe_name,
             Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Tesseract-OCR" / exe_name,
             Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Tesseract-OCR" / exe_name,
