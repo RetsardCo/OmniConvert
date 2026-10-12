@@ -294,6 +294,13 @@ class ConversionWorkspaceView(QWidget):
             else:
                 status_icon = "📄"
             item = QListWidgetItem(f"{status_icon} {meta.filename} ({meta.formatted_size}) [{meta.detected_format.upper()}]")
+            item.setToolTip(
+                f"File: {meta.filename}\n"
+                f"Path: {meta.path}\n"
+                f"Size: {meta.formatted_size} ({meta.size_bytes:,} bytes)\n"
+                f"Format: {meta.detected_format.upper()} ({meta.category.capitalize()})\n"
+                f"MIME: {meta.detected_mime}"
+            )
             self.file_list.addItem(item)
 
         if self.file_list.count() > 0 and self.file_list.currentRow() == -1:
@@ -615,11 +622,15 @@ class ConversionWorkspaceView(QWidget):
             return
 
         query = self.op_filter_edit.text().strip().lower()
+        combo_idx = 0
         for op in self.available_ops:
             label = f"{op.display_name} (.{op.output_format.upper()}) [{op.engine}]"
             if not query or query in label.lower() or query in op.id.lower() or query in op.output_format.lower():
                 self._filtered_items.append(("cap", op))
                 self.op_combo.addItem(label, op.id)
+                tip = f"{op.display_name}\nTarget: .{op.output_format.upper()}\nEngine: {op.engine.upper()}\n{op.description}"
+                self.op_combo.setItemData(combo_idx, tip, Qt.ToolTipRole)
+                combo_idx += 1
 
         for wf in self.available_workflows:
             step_names = " ➔ ".join(f".{s.output_format.upper()}" for s in wf.steps)
@@ -627,6 +638,9 @@ class ConversionWorkspaceView(QWidget):
             if not query or query in label.lower() or query in wf.target_format.lower():
                 self._filtered_items.append(("workflow", wf))
                 self.op_combo.addItem(label, f"workflow:{wf.target_format}")
+                tip = f"Multi-Step Pipeline: {wf.summary()}\nInitial: .{wf.source_format.upper()} ➔ Target: .{wf.target_format.upper()}"
+                self.op_combo.setItemData(combo_idx, tip, Qt.ToolTipRole)
+                combo_idx += 1
 
         self.op_combo.blockSignals(False)
 

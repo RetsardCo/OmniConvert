@@ -79,17 +79,19 @@ class HistoryView(QWidget):
             elif rec.destination_path:
                 detail += f" | {rec.destination_path}"
 
-            vals = [
-                rec.started_at,
-                rec.source_name,
-                rec.operation_id,
-                f".{rec.target_format.upper()}",
-                rec.engine,
-                rec.status.upper(),
-                detail
+            vals_and_tips = [
+                (rec.started_at, f"Conversion Started: {rec.started_at}"),
+                (rec.source_name, f"Source File: {rec.source_path}"),
+                (rec.operation_id, f"Operation: {rec.operation_id}"),
+                (f".{rec.target_format.upper()}", f"Target Format: .{rec.target_format.upper()}"),
+                (rec.engine, f"Engine Used: {rec.engine}"),
+                (rec.status.upper(), f"Result Status: {rec.status.upper()}"),
+                (detail, f"Full Path / Error Details:\n{detail}")
             ]
-            for c_idx, val in enumerate(vals):
-                self.table.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
+            for c_idx, (val, tip) in enumerate(vals_and_tips):
+                item = QTableWidgetItem(str(val))
+                item.setToolTip(tip)
+                self.table.setItem(r_idx, c_idx, item)
 
     def _on_row_double_clicked(self, row: int, _col: int):
         """Double clicking a history row opens the converted file or its folder."""
@@ -214,17 +216,22 @@ class FormatExplorerView(QWidget):
             status_txt = "✅ Ready" if avail else f"⚠️ Missing ({cap.engine})"
             notes = "; ".join(cap.limitations) if cap.limitations else cap.description
 
-            row_vals = [
-                cap.display_name,
-                ", ".join(cap.input_formats[:8]) + ("..." if len(cap.input_formats) > 8 else ""),
-                f".{cap.output_format.upper()}",
-                cap.engine.upper(),
-                fidelity,
-                status_txt,
-                notes
+            all_inputs_str = ", ".join(cap.input_formats)
+            truncated_inputs = ", ".join(cap.input_formats[:8]) + ("..." if len(cap.input_formats) > 8 else "")
+
+            row_data = [
+                (cap.display_name, f"Operation: {cap.display_name}\nID: {cap.id}\nCategory: {cap.output_category}"),
+                (truncated_inputs, f"Supported Input Formats ({len(cap.input_formats)}):\n{all_inputs_str}"),
+                (f".{cap.output_format.upper()}", f"Target Output: .{cap.output_format.upper()} ({cap.output_category})"),
+                (cap.engine.upper(), f"Underlying Engine: {cap.engine.upper()}"),
+                (fidelity, f"Encoding Fidelity: {fidelity}"),
+                (status_txt, f"Engine Availability: {status_txt}"),
+                (notes, f"Limitations & Capabilities:\n{notes}")
             ]
-            for c_idx, val in enumerate(row_vals):
-                self.table.setItem(r_idx, c_idx, QTableWidgetItem(str(val)))
+            for c_idx, (val, tooltip_text) in enumerate(row_data):
+                item = QTableWidgetItem(str(val))
+                item.setToolTip(tooltip_text)
+                self.table.setItem(r_idx, c_idx, item)
 
 
 class SettingsView(QWidget):
