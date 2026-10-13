@@ -283,5 +283,6 @@ class MainWindow(QMainWindow):
             if res != QMessageBox.Yes:
                 event.ignore()
                 return
-        logger.info("Application closing safely.")
+        logger.info("Application closing safely: cancelling active jobs and shutting down thread pool.")
+        self.job_manager.shutdown(timeout_ms=1000)
         event.accept()

@@ -9,6 +9,7 @@ All conversions listed below are **100% local and offline** (no cloud APIs or ex
 | Operation ID | Source Formats | Target Format | Engine | Quality / Detail Controls | Notes & Limitations |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `pdf.to_docx` | `pdf` | `docx` | `pypdf` (`pdf2docx` + `PyMuPDF` + `python-docx`) | Lossless / Exact, High, Balanced, Compact | Reconstructs editable paragraphs, tables, and embedded images. Scanned image-only PDFs are embedded as high-DPI page images unless OCR is used. |
+| `pdf.to_xlsx` | `pdf` | `xlsx` | `pypdf` (`PyMuPDF` + `openpyxl`) | One Worksheet per Page, Extract Plain Text | Extracts structured tables and cell grids from PDF pages directly into an Excel workbook (`.xlsx`) with numeric formatting and auto column width. |
 | `pdf.extract_pages` | `pdf` | `pdf` | `pypdf` | Start Page (`1`..N), End Page (`0`=Last) | Extracts or splits a page range from a PDF into a new PDF document. |
 | `office.to_pdf` | `docx`, `doc`, `pptx`, `xlsx`, `odt`, `rtf`, `txt`, `markdown`, `html` | `pdf` | `libreoffice` (`reportlab` / `openpyxl` / `python-pptx` / LibreOffice) | Lossless / Exact (300 DPI), High, Balanced, Compact, Page Size (`letter`/`a4`) | Offline pure-Python rendering preserving interleaved paragraphs, tables, and images in document order, with automatic LibreOffice escalation when installed. |
 | `office.to_docx` | `txt`, `markdown`, `html`, `rtf` | `docx` | `libreoffice` (`python-docx`) | — | Converts Plain Text, Markdown, or HTML into an editable Microsoft Word (`.docx`) document. |

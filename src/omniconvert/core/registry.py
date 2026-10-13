@@ -329,6 +329,23 @@ class CapabilityRegistry:
             },
             limitations=["Complex multi-column vector graphics may be approximated as images or paragraphs."]
         ))
+        self.register(Capability(
+            id="pdf.to_xlsx",
+            display_name="Convert PDF to Excel (.xlsx)",
+            description="Extract tables and structured data from PDF pages directly into an editable Microsoft Excel (.xlsx) spreadsheet.",
+            input_categories=["document"],
+            input_formats=["pdf"],
+            output_category="document",
+            output_format="xlsx",
+            engine="pypdf",
+            operation="pdf_to_xlsx",
+            lossy=False,
+            settings_schema={
+                "sheet_per_page": {"type": "bool", "default": True, "label": "One Worksheet per PDF Page"},
+                "extract_plain_text": {"type": "bool", "default": True, "label": "Extract Non-Table Text as Rows"}
+            },
+            limitations=["Unstructured scanned PDFs without OCR or table borders may extract text into single columns."]
+        ))
 
         self.register(Capability(
             id="office.to_pdf",

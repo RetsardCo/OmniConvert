@@ -276,3 +276,15 @@ class JobManager(QObject):
 
     def active_jobs_count(self) -> int:
         return self.thread_pool.activeThreadCount()
+
+    def cancel_all(self):
+        """Cancel all running and queued jobs."""
+        for runnable in self._runnables.values():
+            runnable.cancel()
+
+    def shutdown(self, timeout_ms: int = 1500):
+        """Cancel all running jobs and stop thread pool execution."""
+        self.cancel_all()
+        self.thread_pool.clear()
+        self.thread_pool.waitForDone(timeout_ms)
+

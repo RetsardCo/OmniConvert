@@ -29,11 +29,51 @@ def run_app():
     app.setApplicationName("OmniConvert")
     app.setOrganizationName("OmniConvert")
 
+    # Single-instance enforcement: ensure only one GUI instance of the application runs
+    server_name = "OmniConvert_SingleInstance_IPC"
+    allow_multiple = os.environ.get("OMNICONVERT_ALLOW_MULTIPLE_INSTANCES", "0") == "1"
+    local_server = None
+
+    if not allow_multiple:
+        from PySide6.QtNetwork import QLocalSocket, QLocalServer
+        socket = QLocalSocket()
+        socket.connectToServer(server_name)
+        if socket.waitForConnected(300):
+            # Another instance is already running: signal it to activate and exit
+            socket.write(b"ACTIVATE\n")
+            socket.flush()
+            socket.disconnectFromServer()
+            logging.info("Existing OmniConvert instance detected. Activated window and exiting secondary process.")
+            return 0
+
+        # Primary instance: create local IPC server
+        local_server = QLocalServer()
+        QLocalServer.removeServer(server_name)
+        local_server.listen(server_name)
+
     icon_path = get_icon_path(prefer_ico=True)
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
     window = MainWindow(settings)
+
+    if local_server:
+        def _on_new_instance():
+            client = local_server.nextPendingConnection()
+            if client:
+                client.waitForReadyRead(300)
+                client.disconnectFromServer()
+                window.showNormal()
+                window.raise_()
+                window.activateWindow()
+        local_server.newConnection.connect(_on_new_instance)
+
     window.show()
 
-    return app.exec()
+    ret = app.exec()
+    if local_server and local_server.isListening():
+        local_server.close()
+        from PySide6.QtNetwork import QLocalServer
+        QLocalServer.removeServer(server_name)
+    return ret
+

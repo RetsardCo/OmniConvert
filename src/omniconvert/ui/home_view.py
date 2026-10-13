@@ -161,7 +161,7 @@ class HomeView(QWidget):
         cards_layout.setSpacing(12)
 
         categories = [
-            ("📄 PDF ⇄ Word & Office", "PDF to Word (.docx), Word/Excel/PPT to PDF, Markdown, HTML, TXT, CSV, JSON"),
+            ("📄 PDF ⇄ Word & Office", "PDF to Word (.docx) & Excel (.xlsx), Word/Excel/PPT to PDF, Markdown, HTML, TXT, CSV, JSON"),
             ("🖼️ Lossless Images", "PNG, JPEG (100% 4:4:4 Lossless Color), WebP, TIFF, BMP, GIF, SVG, Multi-Size .ICO"),
             ("🎵 Full Audio & Video", "MP3 (320k), WAV (24-bit PCM), FLAC, AAC, M4A (ALAC), OGG, OPUS, AIFF, MP4, MKV, WebM, GIF"),
             ("📦 Archives & Workflows", "ZIP, TAR, GZ, 7Z safe extraction/packing, Local TTS Speech, Binary Inspection"),

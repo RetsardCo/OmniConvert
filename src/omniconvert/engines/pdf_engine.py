@@ -66,7 +66,11 @@ class PDFEngine(BaseEngine):
         if op == "pdf.to_docx" or target_format == "docx":
             return self._pdf_to_docx(source, workspace_dir, settings, job, progress_callback, is_cancelled)
 
-        # 3. PDF to Image (.png / .jpeg)
+        # 3. PDF to Excel (.xlsx)
+        if op == "pdf.to_xlsx" or target_format in ("xlsx", "xls"):
+            return self._pdf_to_xlsx(source, workspace_dir, settings, job, progress_callback, is_cancelled)
+
+        # 4. PDF to Image (.png / .jpeg)
         if op in ("pdf.to_png", "pdf.to_jpeg") or target_format in ("png", "jpg", "jpeg"):
             return self._pdf_to_image(source, workspace_dir, target_format, settings, progress_callback, is_cancelled)
 
@@ -312,6 +316,194 @@ class PDFEngine(BaseEngine):
 
         if progress_callback:
             progress_callback(JobProgress(percentage=100.0, stage="Complete", detail="Saved Word (.docx) document"))
+
+        return target_file
+
+    def _pdf_to_xlsx(
+        self,
+        source: Path,
+        workspace_dir: Path,
+        settings: Dict[str, Any],
+        job: ConversionJob,
+        progress_callback: Optional[Callable[[JobProgress], None]],
+        is_cancelled: Optional[Callable[[], bool]]
+    ) -> Path:
+        """
+        Convert PDF tables and structured content directly into an editable Microsoft Excel (.xlsx) workbook.
+        Leverages PyMuPDF (fitz) table detection with structured fallback and openpyxl formatting.
+        """
+        import openpyxl
+        from openpyxl.utils import get_column_letter
+        import re
+
+        target_file = workspace_dir / f"{source.stem}.xlsx"
+        sheet_per_page = bool(settings.get("sheet_per_page", True))
+        extract_plain_text = bool(settings.get("extract_plain_text", True))
+
+        if progress_callback:
+            progress_callback(JobProgress(percentage=10.0, stage="Analyzing PDF Tables", detail=f"Extracting tables from {source.name}"))
+
+        wb = openpyxl.Workbook()
+        default_sheet = wb.active
+
+        def _parse_excel_cell(cell: Any) -> Any:
+            if cell is None:
+                return ""
+            s = str(cell).strip()
+            if not s:
+                return ""
+            # Preserve strings with leading zeros (e.g. "007", "01234" zip codes/IDs)
+            if (s.startswith("0") or s.startswith("+0") or s.startswith("-0")) and len(s) > 1 and not s.startswith("0."):
+                return s
+            if re.fullmatch(r"[-+]?\d+", s):
+                try:
+                    return int(s)
+                except ValueError:
+                    pass
+            if re.fullmatch(r"[-+]?\d+\.\d+", s):
+                try:
+                    return float(s)
+                except ValueError:
+                    pass
+            return s
+
+        try:
+            import fitz
+            doc = fitz.open(str(source))
+            if doc.is_encrypted:
+                password = settings.get("password", "")
+                if not doc.authenticate(password):
+                    raise ValueError("PDF is encrypted and password was invalid or not provided.")
+
+            total_pages = len(doc)
+            if total_pages == 0:
+                doc.close()
+                raise ValueError("PDF document contains 0 pages.")
+
+            sheet_count = 0
+            current_ws = None
+
+            for p_idx in range(total_pages):
+                if is_cancelled and is_cancelled():
+                    doc.close()
+                    raise InterruptedError("Cancelled during PDF to Excel conversion.")
+
+                if progress_callback:
+                    pct = 10.0 + (p_idx / max(1, total_pages)) * 80.0
+                    progress_callback(JobProgress(
+                        percentage=pct,
+                        stage="Extracting Tables",
+                        detail=f"Processing Page {p_idx + 1}/{total_pages}"
+                    ))
+
+                page = doc[p_idx]
+                tabs = page.find_tables()
+                has_tables = tabs is not None and len(tabs.tables) > 0
+
+                if sheet_per_page or current_ws is None:
+                    sheet_title = f"Page {p_idx + 1}" if sheet_per_page else "Extracted Data"
+                    if sheet_count == 0:
+                        current_ws = default_sheet
+                        current_ws.title = sheet_title
+                    else:
+                        current_ws = wb.create_sheet(title=sheet_title)
+                    sheet_count += 1
+                elif not sheet_per_page and p_idx > 0:
+                    current_ws.append([])
+                    current_ws.append([f"--- Page {p_idx + 1} ---"])
+
+                rows_added = 0
+                if has_tables:
+                    for t_idx, tab in enumerate(tabs):
+                        if t_idx > 0:
+                            current_ws.append([])
+                        tab_data = tab.extract()
+                        for row in tab_data:
+                            cleaned_row = [_parse_excel_cell(cell) for cell in row]
+                            current_ws.append(cleaned_row)
+                            rows_added += 1
+                elif extract_plain_text:
+                    text = page.get_text("text") or ""
+                    for line in text.splitlines():
+                        line_str = line.strip()
+                        if not line_str:
+                            continue
+                        if "\t" in line_str:
+                            cells = [c.strip() for c in line_str.split("\t")]
+                        elif " | " in line_str:
+                            cells = [c.strip() for c in line_str.split("|")]
+                        elif "  " in line_str:
+                            cells = [c.strip() for c in re.split(r"\s{2,}", line_str) if c.strip()]
+                        else:
+                            cells = [line_str]
+                        current_ws.append([_parse_excel_cell(c) for c in cells])
+                        rows_added += 1
+
+                if rows_added == 0:
+                    current_ws.append(["(No tables or extractable text found on this page)"])
+
+            doc.close()
+
+        except (ImportError, Exception) as fitz_err:
+            if isinstance(fitz_err, (InterruptedError, ValueError)):
+                raise
+            logger.warning("PyMuPDF fitz table extractor failed or missing, falling back to pypdf: %s", fitz_err)
+            import pypdf
+            reader = pypdf.PdfReader(str(source))
+            if reader.is_encrypted:
+                password = settings.get("password", "")
+                if reader.decrypt(password) == 0:
+                    raise ValueError("PDF is encrypted and password was invalid or not provided.")
+
+            total_pages = len(reader.pages)
+            if total_pages == 0:
+                raise ValueError("PDF document contains 0 pages.")
+
+            sheet_count = 0
+            current_ws = None
+
+            for p_idx, page in enumerate(reader.pages):
+                if is_cancelled and is_cancelled():
+                    raise InterruptedError("Cancelled during PDF to Excel conversion.")
+
+                sheet_title = f"Page {p_idx + 1}" if sheet_per_page else "Extracted Data"
+                if sheet_count == 0:
+                    current_ws = default_sheet
+                    current_ws.title = sheet_title
+                else:
+                    current_ws = wb.create_sheet(title=sheet_title)
+                sheet_count += 1
+
+                text = page.extract_text() or ""
+                lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+                if lines:
+                    for line_str in lines:
+                        if "\t" in line_str:
+                            cells = [c.strip() for c in line_str.split("\t")]
+                        elif "  " in line_str:
+                            cells = [c.strip() for c in re.split(r"\s{2,}", line_str) if c.strip()]
+                        else:
+                            cells = [line_str]
+                        current_ws.append([_parse_excel_cell(c) for c in cells])
+                else:
+                    current_ws.append(["(No text found on this page)"])
+
+        # Auto-adjust column widths for readability across all sheets
+        for sheet in wb.worksheets:
+            for col in sheet.columns:
+                max_len = 0
+                for cell in col:
+                    val_str = str(cell.value or "")
+                    if len(val_str) > max_len:
+                        max_len = len(val_str)
+                col_letter = get_column_letter(col[0].column)
+                sheet.column_dimensions[col_letter].width = min(max(max_len + 3, 10), 60)
+
+        wb.save(str(target_file))
+        wb.close()
+
+        if progress_callback:
+            progress_callback(JobProgress(percentage=100.0, stage="Complete", detail="Excel spreadsheet generated successfully"))
 
         return target_file
 

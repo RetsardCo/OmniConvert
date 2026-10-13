@@ -148,3 +148,140 @@ def test_job_manager_pdf_execution(sample_image, tmp_path):
     assert dest_path.exists()
     assert dest_path.suffix == ".pdf"
     assert job.state == JobState.COMPLETED
+
+
+def test_pdf_to_xlsx_table_extraction(tmp_path):
+    """Verify direct PDF to Excel conversion extracts tables and cell types accurately."""
+    from reportlab.platypus import SimpleDocTemplate, Table, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    import openpyxl
+
+    pdf_file = tmp_path / "table_doc.pdf"
+    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(str(pdf_file))
+    elements = [
+        Paragraph("Invoice Summary", styles["Heading1"]),
+        Spacer(1, 10),
+        Table([
+            ["Item", "Quantity", "Unit Price", "Total"],
+            ["Widget A", "10", "15.50", "155.00"],
+            ["Gadget B", "-2", "-45.00", "01234"],
+            ["Part C", "100", "1.25", "125.00"]
+        ], style=[
+            ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ])
+    ]
+    doc.build(elements)
+
+    engine = PDFEngine()
+    ws = tmp_path / "ws_xlsx"
+    ws.mkdir()
+
+    job = ConversionJob(
+        source_path=pdf_file,
+        target_format="xlsx",
+        operation_id="pdf.to_xlsx",
+        engine="pypdf",
+        settings={"sheet_per_page": True}
+    )
+    xlsx_out = engine.execute(job=job, workspace_dir=ws)
+    assert xlsx_out.exists()
+    assert xlsx_out.suffix == ".xlsx"
+    assert xlsx_out.stat().st_size > 1000
+
+    wb = openpyxl.load_workbook(str(xlsx_out))
+    assert "Page 1" in wb.sheetnames
+    sheet = wb["Page 1"]
+    rows = list(sheet.iter_rows(values_only=True))
+    assert len(rows) >= 4
+
+    # Locate table header
+    header_idx = None
+    for idx, r in enumerate(rows):
+        if r and "Item" in r:
+            header_idx = idx
+            break
+    assert header_idx is not None
+    assert rows[header_idx][0] == "Item"
+    assert rows[header_idx][1] == "Quantity"
+    # Verify row content
+    data_row = rows[header_idx + 1]
+    assert data_row[0] == "Widget A"
+    assert data_row[1] == 10  # integer cast
+    assert data_row[2] == 15.50  # float cast
+
+    # Verify negative numbers and preserved leading zeros
+    data_row_2 = rows[header_idx + 2]
+    assert data_row_2[0] == "Gadget B"
+    assert data_row_2[1] == -2  # negative integer cast
+    assert data_row_2[2] == -45.00  # negative float cast
+    assert data_row_2[3] == "01234"  # leading zeros preserved as string
+    wb.close()
+
+
+def test_pdf_to_xlsx_combined_sheet_setting(tmp_path):
+    """Verify sheet_per_page=False combines pages into single worksheet."""
+    from reportlab.platypus import SimpleDocTemplate, Table, PageBreak
+    from reportlab.lib import colors
+    import openpyxl
+
+    pdf_file = tmp_path / "multi_table.pdf"
+    doc = SimpleDocTemplate(str(pdf_file))
+    elements = [
+        Table([["Page 1 Col A", "Page 1 Col B"], ["Val1", "Val2"]], style=[("GRID", (0, 0), (-1, -1), 1, colors.black)]),
+        PageBreak(),
+        Table([["Page 2 Col A", "Page 2 Col B"], ["Val3", "Val4"]], style=[("GRID", (0, 0), (-1, -1), 1, colors.black)])
+    ]
+    doc.build(elements)
+
+    engine = PDFEngine()
+    ws = tmp_path / "ws_combined"
+    ws.mkdir()
+
+    job = ConversionJob(
+        source_path=pdf_file,
+        target_format="xlsx",
+        operation_id="pdf.to_xlsx",
+        engine="pypdf",
+        settings={"sheet_per_page": False}
+    )
+    xlsx_out = engine.execute(job=job, workspace_dir=ws)
+    assert xlsx_out.exists()
+
+    wb = openpyxl.load_workbook(str(xlsx_out))
+    assert len(wb.sheetnames) == 1
+    assert wb.sheetnames[0] == "Extracted Data"
+    sheet = wb.active
+    all_vals = [cell for row in sheet.iter_rows(values_only=True) for cell in row if cell]
+    assert "Page 1 Col A" in all_vals
+    assert "Page 2 Col A" in all_vals
+    wb.close()
+
+
+def test_pdf_to_xlsx_capability_registration():
+    """Verify pdf.to_xlsx is registered and selectable for PDF files."""
+    from omniconvert.core.registry import CapabilityRegistry
+    from omniconvert.core.file_detector import FileMetadata
+
+    registry = CapabilityRegistry()
+    cap = registry.get("pdf.to_xlsx")
+    assert cap is not None
+    assert cap.output_format == "xlsx"
+    assert cap.engine == "pypdf"
+    assert "pdf" in cap.input_formats
+
+    meta = FileMetadata(
+        path=Path("dummy.pdf"),
+        filename="dummy.pdf",
+        extension="pdf",
+        size_bytes=1024,
+        detected_mime="application/pdf",
+        detected_format="pdf",
+        category="document",
+        is_readable=True,
+        is_empty=False
+    )
+    ops = registry.find_operations_for_file(meta, only_available=True)
+    assert any(o.id == "pdf.to_xlsx" for o in ops)
